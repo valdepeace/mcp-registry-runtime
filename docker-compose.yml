@@ -1,0 +1,86 @@
+services:
+  registry:
+    build:
+      context: ./apps/registry
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${PORT:-3000}
+      - OFFICIAL_REGISTRY_URL=${OFFICIAL_REGISTRY_URL:-https://registry.modelcontextprotocol.io}
+      - SYNC_INTERVAL_MS=${SYNC_INTERVAL_MS:-300000}
+      - DB_PATH=${DB_PATH:-/app/data/registry.db}
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
+      - ADMIN_USERNAME=${ADMIN_USERNAME:-admin}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD:-admin}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+    volumes:
+      - registry-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: '512M'
+        reservations:
+          cpus: '0.25'
+          memory: '128M'
+
+  runtime:
+    build:
+      context: ./apps/runtime
+      dockerfile: Dockerfile
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${RUNTIME_PORT:-3001}
+      - DB_PATH=${RUNTIME_DB_PATH:-/app/data/runtime.db}
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - REGISTRY_URL=http://registry:3000
+    volumes:
+      - runtime-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: '512M'
+        reservations:
+          cpus: '0.25'
+          memory: '128M'
+
+  frontend:
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "5173:8080"
+    depends_on:
+      registry:
+        condition: service_healthy
+      runtime:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  registry-data:
+  runtime-data:

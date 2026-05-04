@@ -1,0 +1,33 @@
+{
+  "name": "mcp-nova",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Private MCP Server Registry - Monorepo",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "concurrently --kill-others -n registry,runtime,ag-runtime,front -c blue,green,magenta,yellow \"npm --prefix apps/registry run dev\" \"npm --prefix apps/runtime run dev\" \"npm --prefix apps/agent-runtime run dev\" \"npm --prefix apps/frontend run dev\"",
+    "dev:registry": "npm --prefix apps/registry run dev",
+    "dev:runtime": "npm --prefix apps/runtime run dev",
+    "dev:agent-runtime": "npm --prefix apps/agent-runtime run dev",
+    "dev:frontend": "npm --prefix apps/frontend run dev",
+    "build": "npm --prefix apps/registry run build && npm --prefix apps/runtime run build && npm --prefix apps/agent-runtime run build && npm --prefix apps/frontend run build",
+    "build:registry": "npm --prefix apps/registry run build",
+    "build:runtime": "npm --prefix apps/runtime run build",
+    "build:agent-runtime": "npm --prefix apps/agent-runtime run build",
+    "build:frontend": "npm --prefix apps/frontend run build",
+    "start": "npm --prefix apps/registry run start",
+    "typecheck": "npm --prefix apps/registry run typecheck && npm --prefix apps/runtime run typecheck && npm --prefix apps/agent-runtime run typecheck && npm --prefix apps/frontend run typecheck"
+  },
+  "keywords": [
+    "mcp",
+    "registry",
+    "model-context-protocol"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}
