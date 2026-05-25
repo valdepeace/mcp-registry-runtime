@@ -27,6 +27,7 @@ router.get(
       search?: string;
       transport_type?: TransportType;
       source?: 'registry' | 'private' | 'azure-devops' | 'all';
+      origin?: string;
       category?: ServerCategory;
       tags?: string;
       verified?: boolean;
@@ -41,6 +42,7 @@ router.get(
       search: query.search,
       transportType: query.transport_type,
       source: query.source,
+      origin: query.origin,
       category: query.category,
       tags: query.tags,
       verified: query.verified,

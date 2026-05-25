@@ -3,7 +3,7 @@ import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import cors from 'cors';
 import { config } from './config/index.js';
-import { agentRuntimeRoutes } from './routes/index.js';
+import { agentRuntimeRoutes, ollamaRoutes } from './routes/index.js';
 import { databaseService } from './services/index.js';
 
 const app = express();
@@ -29,7 +29,17 @@ app.get('/health', (_req, res) => {
   });
 });
 
+app.get('/admin/agent-runtime/health', (_req, res) => {
+  const instanceCount = databaseService.listInstances().length;
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    instances: instanceCount,
+  });
+});
+
 app.use('/admin/agent-runtime', agentRuntimeRoutes);
+app.use('/admin/ollama', ollamaRoutes);
 
 app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
   console.error('[Error] Unhandled exception:');
@@ -78,6 +88,11 @@ async function shutdown(signal: string): Promise<void> {
 let httpServer: ReturnType<typeof app.listen> | null = null;
 
 function bootstrap() {
+  const reconciled = databaseService.markVolatileInstancesStopped();
+  if (reconciled > 0) {
+    console.log(`[Server] Reconciled ${reconciled} in-process agent instance(s) to stopped`);
+  }
+
   httpServer = app.listen(config.port, () => {
     console.log(`[Server] Agent Runtime running on port ${config.port}`);
     console.log(`[Server] Environment: ${config.nodeEnv}`);

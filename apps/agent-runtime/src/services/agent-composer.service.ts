@@ -1,18 +1,18 @@
-import type { AgentDetail, AgentResponse, SkillResponse } from '@mcp-nova/types';
+import type { AgentDetail, AgentResponse } from '@mcp-nova/types';
 import { config } from '../config/index.js';
+import type { ResolvedSkill, ResolvedMCPServer, AgentSnapshot } from '../mastra/agent-factory.js';
+import { createMastraAgent, resolveAgentSnapshot, type MastraAgentResult } from '../mastra/agent-factory.js';
 
-interface ResolvedSkill {
-  name: string;
-  version: string;
-  content: string;
-  format: string;
-}
+export type { ResolvedSkill, ResolvedMCPServer, MastraAgentResult, AgentSnapshot };
 
-interface ResolvedMCPServer {
-  name: string;
-  version: string;
-  instanceId?: string;
-  tools?: string[];
+export class AgentLookupError extends Error {
+  constructor(
+    public readonly code: 'not_found' | 'fetch_failed',
+    message: string
+  ) {
+    super(message);
+    this.name = 'AgentLookupError';
+  }
 }
 
 export interface ComposedAgent {
@@ -24,115 +24,54 @@ export interface ComposedAgent {
 
 export class AgentComposerService {
   private registryUrl: string;
-  private runtimeUrl: string;
 
   constructor() {
     this.registryUrl = config.registryUrl;
-    this.runtimeUrl = config.runtimeUrl;
   }
 
-  async fetchAgent(name: string, version: string): Promise<AgentResponse | null> {
+  async resolveAgent(name: string, version: string): Promise<AgentResponse> {
     const encodedName = encodeURIComponent(name);
     const encodedVersion = encodeURIComponent(version);
     const url = new URL(`/v0.1/agents/${encodedName}/versions/${encodedVersion}`, this.registryUrl);
 
-    const response = await fetch(url.toString(), {
-      headers: { 'Accept': 'application/json' },
-    });
+    let response: globalThis.Response;
+    try {
+      response = await fetch(url.toString(), {
+        headers: { 'Accept': 'application/json' },
+      });
+    } catch (err) {
+      throw new AgentLookupError(
+        'fetch_failed',
+        `Cannot reach registry at ${this.registryUrl}: ${err instanceof Error ? err.message : 'network error'}`
+      );
+    }
 
     if (!response.ok) {
-      if (response.status === 404) return null;
-      console.error(`[Composer] Failed to fetch agent ${name}@${version}: ${response.status}`);
-      return null;
+      if (response.status === 404) {
+        throw new AgentLookupError('not_found', `Agent ${name}@${version} was not found in the registry`);
+      }
+
+      throw new AgentLookupError(
+        'fetch_failed',
+        `Failed to fetch agent ${name}@${version} from registry (${response.status})`
+      );
     }
 
     return response.json() as Promise<AgentResponse>;
   }
 
-  async fetchSkill(name: string, version: string): Promise<SkillResponse | null> {
-    const encodedName = encodeURIComponent(name);
-    const encodedVersion = encodeURIComponent(version);
-    const url = new URL(`/v0.1/skills/${encodedName}/versions/${encodedVersion}`, this.registryUrl);
-
-    const response = await fetch(url.toString(), {
-      headers: { 'Accept': 'application/json' },
-    });
-
-    if (!response.ok) {
-      if (response.status === 404) return null;
-      console.error(`[Composer] Failed to fetch skill ${name}@${version}: ${response.status}`);
-      return null;
-    }
-
-    return response.json() as Promise<SkillResponse>;
-  }
-
-  async resolveSkills(skillRefs: { name: string; version: string }[]): Promise<ResolvedSkill[]> {
-    const resolved: ResolvedSkill[] = [];
-
-    for (const ref of skillRefs) {
-      const skillResponse = await this.fetchSkill(ref.name, ref.version);
-      if (skillResponse) {
-        resolved.push({
-          name: ref.name,
-          version: ref.version,
-          content: skillResponse.skill.content,
-          format: skillResponse.skill.format,
-        });
-      } else {
-        console.warn(`[Composer] Skill not found: ${ref.name}@${ref.version}`);
-      }
-    }
-
-    return resolved;
-  }
-
-  async resolveMCPServers(mcpRefs: { name: string; version: string }[]): Promise<ResolvedMCPServer[]> {
-    const resolved: ResolvedMCPServer[] = [];
-
-    for (const ref of mcpRefs) {
-      // Resolve MCP server via runtime
-      const encodedName = encodeURIComponent(ref.name);
-      const encodedVersion = encodeURIComponent(ref.version);
-      const url = new URL(`/v0.1/servers/${encodedName}/versions/${encodedVersion}`, this.registryUrl);
-
-      try {
-        const response = await fetch(url.toString(), {
-          headers: { 'Accept': 'application/json' },
-        });
-
-        if (!response.ok) {
-          console.warn(`[Composer] MCP server not found in registry: ${ref.name}@${ref.version}`);
-          resolved.push({ name: ref.name, version: ref.version });
-          continue;
-        }
-
-        const serverResponse = await response.json() as { server: { packages?: { transport?: { type: string } }[] } };
-        const tools: string[] = [];
-
-        // If the server has a stdio transport package, we could inspect tools via runtime
-        // For now, just record the reference
-        resolved.push({
-          name: ref.name,
-          version: ref.version,
-          tools,
-        });
-      } catch (err) {
-        console.warn(`[Composer] Error resolving MCP server ${ref.name}@${ref.version}:`, err);
-        resolved.push({ name: ref.name, version: ref.version });
-      }
-    }
-
-    return resolved;
-  }
-
   async compose(agentName: string, agentVersion: string): Promise<ComposedAgent | null> {
     console.log(`[Composer] Composing agent: ${agentName}@${agentVersion}`);
 
-    const agentResponse = await this.fetchAgent(agentName, agentVersion);
-    if (!agentResponse) {
-      console.error(`[Composer] Agent not found: ${agentName}@${agentVersion}`);
-      return null;
+    let agentResponse: AgentResponse;
+    try {
+      agentResponse = await this.resolveAgent(agentName, agentVersion);
+    } catch (error) {
+      if (error instanceof AgentLookupError) {
+        console.error(`[Composer] ${error.message}`);
+        return null;
+      }
+      throw error;
     }
 
     const agent = agentResponse.agent;
@@ -156,6 +95,96 @@ export class AgentComposerService {
     };
   }
 
+  async composeMastra(
+    agentName: string,
+    agentVersion: string,
+    envOverrides: Record<string, string> = {}
+  ): Promise<MastraAgentResult | null> {
+    console.log(`[Composer] Composing Mastra agent: ${agentName}@${agentVersion}`);
+
+    const agentResponse = await this.resolveAgent(agentName, agentVersion);
+    return createMastraAgent(agentResponse.agent, envOverrides);
+  }
+
+  /**
+   * Fetches the agent definition plus all its skill/MCP dependencies from the registry
+   * and returns a serializable snapshot. Store this at instance-creation time so that
+   * subsequent starts do not need the registry to be reachable.
+   */
+  async resolveSnapshot(agentName: string, agentVersion: string): Promise<AgentSnapshot> {
+    const agentResponse = await this.resolveAgent(agentName, agentVersion);
+    return resolveAgentSnapshot(agentResponse.agent);
+  }
+
+  private async resolveSkills(skillRefs: { name: string; version: string }[]): Promise<ResolvedSkill[]> {
+    const resolved: ResolvedSkill[] = [];
+
+    for (const ref of skillRefs) {
+      const encodedName = encodeURIComponent(ref.name);
+      const encodedVersion = encodeURIComponent(ref.version);
+      const url = new URL(`/v0.1/skills/${encodedName}/versions/${encodedVersion}`, this.registryUrl);
+
+      try {
+        const response = await fetch(url.toString(), {
+          headers: { 'Accept': 'application/json' },
+        });
+
+        if (!response.ok) {
+          console.warn(`[Composer] Skill not found: ${ref.name}@${ref.version}`);
+          continue;
+        }
+
+        const skillResponse = await response.json() as { skill: { content: string; format: string } };
+        resolved.push({
+          name: ref.name,
+          version: ref.version,
+          content: skillResponse.skill.content,
+          format: skillResponse.skill.format,
+        });
+      } catch (err) {
+        console.warn(`[Composer] Error resolving skill ${ref.name}@${ref.version}:`, err);
+      }
+    }
+
+    return resolved;
+  }
+
+  private async resolveMCPServers(mcpRefs: { name: string; version: string }[]): Promise<ResolvedMCPServer[]> {
+    const resolved: ResolvedMCPServer[] = [];
+
+    for (const ref of mcpRefs) {
+      const encodedName = encodeURIComponent(ref.name);
+      const encodedVersion = encodeURIComponent(ref.version);
+      const url = new URL(`/v0.1/servers/${encodedName}/versions/${encodedVersion}`, this.registryUrl);
+
+      try {
+        const response = await fetch(url.toString(), {
+          headers: { 'Accept': 'application/json' },
+        });
+
+        if (!response.ok) {
+          console.warn(`[Composer] MCP server not found in registry: ${ref.name}@${ref.version}`);
+          resolved.push({ name: ref.name, version: ref.version, mcpClientConfig: null });
+          continue;
+        }
+
+        await response.json();
+
+        resolved.push({
+          name: ref.name,
+          version: ref.version,
+          mcpClientConfig: null,
+          tools: [],
+        });
+      } catch (err) {
+        console.warn(`[Composer] Error resolving MCP server ${ref.name}@${ref.version}:`, err);
+        resolved.push({ name: ref.name, version: ref.version, mcpClientConfig: null });
+      }
+    }
+
+    return resolved;
+  }
+
   private assemblePrompt(
     agent: AgentDetail,
     skills: ResolvedSkill[],
@@ -163,13 +192,11 @@ export class AgentComposerService {
   ): string {
     const parts: string[] = [];
 
-    // 1. Agent instructions (system prompt)
     parts.push(`# Agent: ${agent.name}`);
     parts.push('');
     parts.push(agent.instructions);
     parts.push('');
 
-    // 2. Skills content
     if (skills.length > 0) {
       parts.push('## Loaded Skills');
       parts.push('');
@@ -181,7 +208,6 @@ export class AgentComposerService {
       }
     }
 
-    // 3. Available MCP tools
     if (mcpServers.length > 0) {
       parts.push('## Available MCP Servers');
       parts.push('');
@@ -194,7 +220,6 @@ export class AgentComposerService {
       parts.push('');
     }
 
-    // 4. Tool access
     if (agent.tool_access && agent.tool_access.length > 0) {
       parts.push('## Authorized Tools');
       parts.push('');

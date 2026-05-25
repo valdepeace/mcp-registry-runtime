@@ -67,6 +67,8 @@ export type ListSkillsQuery = z.infer<typeof ListSkillsQuerySchema>;
 
 export const SkillResponseSchema = z.object({
   skill: SkillDetailSchema,
+  source: z.enum(['registry', 'private']).optional(),
+  provider_name: z.string().optional(),
   _meta: z.record(z.unknown()).optional(),
 });
 

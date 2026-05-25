@@ -2,6 +2,7 @@ export * from './mcp-registry.js';
 export * from './runtime.js';
 export * from './skills.js';
 export * from './agents.js';
+export * from './agent-runtime.js';
 
 // schemas.js shares NovaMeta, ServerCategory, and NOVA_META_NAMESPACE with mcp-registry.js
 // — use explicit re-exports to avoid ambiguity

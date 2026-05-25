@@ -9,7 +9,7 @@
     disabled?: boolean;
   }
 
-  let { value = $bindable(), onSelect, placeholder = 'Search servers...', disabled = false }: Props = $props();
+  let { value = $bindable(), onSelect, placeholder = 'Search MCPs...', disabled = false }: Props = $props();
 
   let query = $state('');
   let results = $state<ServerListItem[]>([]);

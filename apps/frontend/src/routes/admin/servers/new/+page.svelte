@@ -72,7 +72,7 @@
 </script>
 
 <svelte:head>
-  <title>Add Server - MCP Registry</title>
+  <title>Add MCP - MCP Registry</title>
 </svelte:head>
 
 <div class="max-w-2xl mx-auto px-4 py-8">
@@ -80,7 +80,7 @@
     <a href="/admin" class="text-blue-600 hover:underline text-sm">&larr; Back to Admin</a>
   </div>
 
-  <h1 class="text-2xl font-bold text-gray-900 mb-6">Add Private Server</h1>
+  <h1 class="text-2xl font-bold text-gray-900 mb-6">Add Private MCP</h1>
 
   {#if error}
     <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
@@ -106,7 +106,7 @@
           pattern="^[a-zA-Z0-9.-]+/[a-zA-Z0-9._-]+$"
           class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
-        <p class="text-xs text-gray-500 mt-1">Format: vendor/server-name (e.g., com.company/my-mcp)</p>
+        <p class="text-xs text-gray-500 mt-1">Format: vendor/mcp-name (e.g., com.company/my-mcp)</p>
       </div>
 
       <div>
@@ -286,7 +286,7 @@
         disabled={saving}
         class="flex-1 py-2 px-4 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
-        {saving ? 'Creating...' : 'Create Server'}
+        {saving ? 'Creating...' : 'Create MCP'}
       </button>
       <a
         href="/admin"

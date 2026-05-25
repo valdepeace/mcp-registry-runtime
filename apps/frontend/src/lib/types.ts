@@ -167,6 +167,7 @@ export interface ListServersParams {
   search?: string;
   transport_type?: TransportType;
   source?: ServerSource | 'all';
+  origin?: string;
   version?: string;
   category?: ServerCategory;
   tags?: string;
@@ -376,12 +377,20 @@ export interface AgentInstance {
   status: string;
   exec_cmd: string;
   exec_args: string | null;
+  env_json: string | null;
   resolved_skills: string | null;
   resolved_mcp_instances: string | null;
   composed_prompt: string | null;
-  pm2_name: string;
+  pm2_name: string | null;
   pid: number | null;
   uptime_ms: number | null;
+  restart_count: number | null;
+  last_exit_code: number | null;
+  last_error: string | null;
+  last_started_at: string | null;
+  last_stopped_at: string | null;
+  last_invoked_at: string | null;
+  last_composed_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -418,3 +427,50 @@ export interface AgentInvocation {
   duration_ms: number | null;
   created_at: string;
 }
+
+export interface AgentRuntimeHealth {
+  status: 'ok';
+  timestamp: string;
+  instances: number;
+}
+
+// ── Ollama ────────────────────────────────────────────────────────────────────
+
+export interface OllamaModelDetails {
+  parent_model: string;
+  format: string;
+  family: string;
+  families: string[] | null;
+  parameter_size: string;
+  quantization_level: string;
+}
+
+export interface OllamaModel {
+  name: string;
+  model: string;
+  modified_at: string;
+  size: number;
+  digest: string;
+  details: OllamaModelDetails;
+}
+
+export interface OllamaRunningModel {
+  name: string;
+  model: string;
+  size: number;
+  digest: string;
+  expires_at: string;
+  size_vram: number;
+  details: OllamaModelDetails;
+}
+
+export interface OllamaStatus {
+  running: boolean;
+  version: string | null;
+}
+
+export type OllamaPullEvent =
+  | { type: 'status'; status: string }
+  | { type: 'progress'; status: string; digest?: string; total: number; completed: number }
+  | { type: 'complete'; status: string }
+  | { type: 'error'; error: string };

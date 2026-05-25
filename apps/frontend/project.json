@@ -1,0 +1,30 @@
+{
+  "name": "frontend",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "root": "apps/frontend",
+  "sourceRoot": "apps/frontend/src",
+  "targets": {
+    "dev": {
+      "continuous": true,
+      "command": "vite dev",
+      "options": { "cwd": "{projectRoot}" }
+    },
+    "build": {
+      "command": "vite build",
+      "options": { "cwd": "{projectRoot}" }
+    },
+    "check": {
+      "command": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+      "options": { "cwd": "{projectRoot}" }
+    },
+    "typecheck": {
+      "command": "svelte-check --tsconfig ./tsconfig.json",
+      "options": { "cwd": "{projectRoot}" }
+    },
+    "preview": {
+      "command": "vite preview",
+      "options": { "cwd": "{projectRoot}" }
+    }
+  }
+}

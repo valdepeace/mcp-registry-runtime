@@ -3,7 +3,7 @@
  * Skills are reusable knowledge packs (patterns, workflows, instructions).
  */
 
-import type { NovaMeta } from './mcp-registry.js';
+import type { NovaMeta, Repository } from './mcp-registry.js';
 
 export type SkillFormat = 'markdown' | 'json' | 'yaml';
 
@@ -32,11 +32,7 @@ export interface SkillDetail {
   category?: SkillCategory;
   tags?: string[];
   websiteUrl?: string;
-  repository?: {
-    url: string;
-    source: string;
-    id?: string;
-  };
+  repository?: Repository;
   _meta?: {
     'com.mcp-nova.meta'?: NovaMeta;
     [key: string]: unknown;
@@ -46,6 +42,7 @@ export interface SkillDetail {
 export interface SkillResponse {
   skill: SkillDetail;
   source?: SkillSource;
+  provider_name?: string;
   _meta?: Record<string, unknown>;
 }
 

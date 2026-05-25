@@ -101,6 +101,16 @@
     }
   }
 
+  async function cloneSkill(item: SkillResponse) {
+    try {
+      await api.cloneSkill(item.skill.name, item.skill.version);
+      message = `Cloned ${item.skill.name} to private`;
+      loadSkills();
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Clone failed';
+    }
+  }
+
   $effect(() => {
     if (!$isAuthenticated) { goto('/login'); return; }
     loadSkills();
@@ -216,7 +226,7 @@
                   <button onclick={() => editSkill(item)} class="text-blue-600 hover:underline mr-3 text-xs">Edit</button>
                   <button onclick={() => deleteSkill(item)} class="text-red-600 hover:underline text-xs">Delete</button>
                 {:else}
-                  <span class="text-gray-400 text-xs">Read-only</span>
+                  <button onclick={() => cloneSkill(item)} class="text-green-600 hover:underline text-xs">Clone to Private</button>
                 {/if}
               </td>
             </tr>

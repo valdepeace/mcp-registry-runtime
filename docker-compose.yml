@@ -63,6 +63,40 @@ services:
           cpus: '0.25'
           memory: '128M'
 
+  agent-runtime:
+    build:
+      context: ./apps/agent-runtime
+      dockerfile: Dockerfile
+    ports:
+      - "3027:3027"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${AGENT_RUNTIME_PORT:-3027}
+      - DB_PATH=${AGENT_RUNTIME_DB_PATH:-/app/data/agent-runtime.db}
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - REGISTRY_URL=http://registry:3000
+      - RUNTIME_URL=http://runtime:3001
+      - MASTRA_MODEL=${MASTRA_MODEL:-openai/gemma4}
+      - OPENAI_BASE_URL=${OPENAI_BASE_URL:-http://host.docker.internal:11434/v1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-ollama}
+    volumes:
+      - agent-runtime-data:/app/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3027/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: '512M'
+        reservations:
+          cpus: '0.25'
+          memory: '128M'
+
   frontend:
     build:
       context: ./apps/frontend
@@ -74,6 +108,8 @@ services:
         condition: service_healthy
       runtime:
         condition: service_healthy
+      agent-runtime:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/health"]
@@ -84,3 +120,4 @@ services:
 volumes:
   registry-data:
   runtime-data:
+  agent-runtime-data:

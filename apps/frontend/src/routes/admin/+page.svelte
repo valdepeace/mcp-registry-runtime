@@ -2,13 +2,29 @@
   import { api } from '$lib/api/client';
   import { auth, isAuthenticated, currentUser } from '$lib/stores/auth';
   import { goto } from '$app/navigation';
+  import { ProviderCard } from '$lib/components';
   import type { RegistryStats, ServerResponse } from '$lib/types';
+
+  type SyncProvider = {
+    providerName: string;
+    entityType: string;
+    entityCount: number;
+    lastSync: string | null;
+    lastStatus: string;
+    lastError: string | null;
+    configured: boolean;
+  };
 
   let stats = $state<RegistryStats | null>(null);
   let privateServers = $state<ServerResponse[]>([]);
+  let providers = $state<SyncProvider[]>([]);
   let loading = $state(true);
   let error = $state<string | null>(null);
   let syncing = $state(false);
+  let syncingProvider = $state<string | null>(null);
+  let syncEventSource: EventSource | null = null;
+  let providerProgress = $state<Record<string, { message: string; current?: number; total?: number }>>({});
+  let progressTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Check auth
   $effect(() => {
@@ -17,17 +33,83 @@
     }
   });
 
+  function connectSyncEvents() {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
+    syncEventSource = new EventSource(`/admin/sync/events?token=${encodeURIComponent(token)}`);
+
+    syncEventSource.addEventListener('provider:start', (e: MessageEvent) => {
+      const data = JSON.parse(e.data);
+      syncingProvider = data.providerName;
+      providerProgress = { ...providerProgress, [data.providerName]: { message: 'Starting...' } };
+      clearProgressTimeout();
+    });
+
+    syncEventSource.addEventListener('provider:progress', (e: MessageEvent) => {
+      const data = JSON.parse(e.data);
+      providerProgress = { ...providerProgress, [data.providerName]: { message: data.message, current: data.current, total: data.total } };
+      clearProgressTimeout();
+    });
+
+    syncEventSource.addEventListener('provider:complete', (e: MessageEvent) => {
+      loadProviders();
+      const data = JSON.parse(e.data);
+      clearProviderState(data.providerName);
+    });
+
+    syncEventSource.addEventListener('provider:error', (e: MessageEvent) => {
+      loadProviders();
+      const data = JSON.parse(e.data);
+      clearProviderState(data.providerName);
+    });
+
+    syncEventSource.addEventListener('connected', () => {});
+    syncEventSource.onerror = () => {
+      console.warn('[Sync SSE] Connection error, will retry...');
+    };
+  }
+
+  function clearProviderState(providerName: string) {
+    syncingProvider = null;
+    const newProgress = { ...providerProgress };
+    delete newProgress[providerName];
+    providerProgress = newProgress;
+  }
+
+  function clearProgressTimeout() {
+    if (progressTimeout) { clearTimeout(progressTimeout); progressTimeout = null; }
+  }
+
+  function startProgressTimeout() {
+    clearProgressTimeout();
+    progressTimeout = setTimeout(() => {
+      console.warn('[Sync SSE] Progress timeout — clearing state');
+      syncingProvider = null;
+      loadProviders();
+    }, 45000);
+  }
+
+  async function loadProviders() {
+    try {
+      const { providers: p } = await api.getSyncProviders();
+      providers = p;
+    } catch { /* ignore */ }
+  }
+
   async function loadData() {
     if (!$isAuthenticated) return;
-    
+
     try {
       error = null;
-      const [statsResponse, serversResponse] = await Promise.all([
+      const [statsResponse, serversResponse, providersResponse] = await Promise.all([
         api.getStats(),
-        api.listServers({ source: 'private', limit: 50 })
+        api.listServers({ source: 'private', limit: 50 }),
+        api.getSyncProviders(),
       ]);
       stats = statsResponse;
       privateServers = serversResponse.servers;
+      providers = providersResponse.providers;
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to load data';
     } finally {
@@ -39,12 +121,21 @@
     syncing = true;
     try {
       await api.triggerSync();
-      // Reload stats after a short delay
-      setTimeout(loadData, 2000);
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to trigger sync';
-    } finally {
       syncing = false;
+    }
+  }
+
+  async function syncProvider(providerName: string, entityType: string) {
+    syncingProvider = providerName;
+    providerProgress = { ...providerProgress, [providerName]: { message: 'Starting...' } };
+    startProgressTimeout();
+    try {
+      await api.triggerSyncProvider(entityType, providerName);
+    } catch (e) {
+      error = e instanceof Error ? e.message : `Failed to sync`;
+      clearProviderState(providerName);
     }
   }
 
@@ -71,7 +162,11 @@
   $effect(() => {
     if ($isAuthenticated) {
       loadData();
+      connectSyncEvents();
     }
+    return () => {
+      if (syncEventSource) { syncEventSource.close(); syncEventSource = null; }
+    };
   });
 </script>
 
@@ -103,7 +198,7 @@
     <!-- Stats Cards -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
       <div class="bg-white rounded-lg shadow p-6">
-        <div class="text-sm text-gray-500 mb-1">Total Servers</div>
+        <div class="text-sm text-gray-500 mb-1">Total MCPs</div>
         <div class="text-3xl font-bold text-gray-900">{stats.servers.total}</div>
         <div class="text-xs text-gray-500 mt-1">{stats.servers.registry} registry, {stats.servers.private} private</div>
       </div>
@@ -127,7 +222,7 @@
 
     <!-- Transport Stats -->
     <div class="bg-white rounded-lg shadow p-6 mb-8">
-      <h2 class="text-lg font-semibold text-gray-900 mb-4">Servers by Transport</h2>
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">MCPs by Transport</h2>
       <div class="flex gap-8">
         {#each Object.entries(stats.servers.byTransport) as [transport, count]}
           <div>
@@ -137,6 +232,29 @@
         {/each}
       </div>
     </div>
+
+    <!-- Providers -->
+    {#if providers.length > 0}
+      <div class="mb-8">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Sync Providers</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {#each providers as provider (provider.providerName + provider.entityType)}
+            <ProviderCard
+              providerName={provider.providerName}
+              entityType={provider.entityType as 'servers' | 'skills' | 'agents'}
+              entityCount={provider.entityCount}
+              lastSync={provider.lastSync}
+              lastStatus={provider.lastStatus}
+              lastError={provider.lastError}
+              configured={provider.configured}
+              onSync={() => syncProvider(provider.providerName, provider.entityType)}
+              loading={syncingProvider === provider.providerName}
+              progress={providerProgress[provider.providerName]}
+            />
+          {/each}
+        </div>
+      </div>
+    {/if}
 
     <!-- Sync Section -->
     <div class="bg-white rounded-lg shadow p-6 mb-8">
@@ -173,21 +291,21 @@
       </a>
     </div>
 
-    <!-- Private Servers -->
+    <!-- Private MCPs -->
     <div class="bg-white rounded-lg shadow">
       <div class="px-6 py-4 border-b flex justify-between items-center">
-        <h2 class="text-lg font-semibold text-gray-900">Private Servers</h2>
+        <h2 class="text-lg font-semibold text-gray-900">Private MCPs</h2>
         <a
           href="/admin/servers/new"
           class="px-4 py-2 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
         >
-          Add Server
+          Add MCP
         </a>
       </div>
       
       {#if privateServers.length === 0}
         <div class="p-6 text-center text-gray-600">
-          No private servers yet
+          No private MCPs yet
         </div>
       {:else}
         <div class="divide-y">

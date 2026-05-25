@@ -20,3 +20,8 @@ Thumbs.db
 registry-err.txt
 registry-out.txt
 registry-proc.xml
+
+
+
+.nx/cache
+.nx/workspace-data

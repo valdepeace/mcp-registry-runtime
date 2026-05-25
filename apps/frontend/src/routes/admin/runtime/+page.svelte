@@ -187,7 +187,7 @@
 
   async function handleCreateFromCatalog() {
     if (!catalogServerName) {
-      error = 'Server name is required';
+      error = 'MCP name is required';
       return;
     }
     
@@ -490,12 +490,12 @@
     
     <div>
       <label for="catalogServerName" class="block text-sm font-medium text-gray-700 mb-1">
-        Server <span class="text-red-500">*</span>
+        MCP <span class="text-red-500">*</span>
       </label>
       <ServerCombobox
         bind:value={catalogServerName}
         onSelect={handleServerSelect}
-        placeholder="Search servers..."
+        placeholder="Search MCPs..."
         disabled={actionLoading === 'from-catalog'}
       />
       {#if selectedServer}

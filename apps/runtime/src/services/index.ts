@@ -7,5 +7,6 @@ export { RuntimeService } from './runtime.service.js';
 export { runtimeEventBus } from './event-bus.js';
 export type { RuntimeEventName } from './event-bus.js';
 export { mcpInspectorService } from './mcp-inspector.service.js';
+export { gitService } from './git.service.js';
 
 export const runtimeService = new RuntimeService(databaseService.db);

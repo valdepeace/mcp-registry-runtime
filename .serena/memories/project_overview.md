@@ -1,17 +1,27 @@
 ---
 name: Project Overview
-description: High-level description of the mcp-nova project
+description: High-level description of the mcp-nova project — 4-app monorepo with registry, runtime, agent-runtime, and frontend
 type: project
 ---
 
-Private MCP (Model Context Protocol) server registry monorepo.
+Private MCP (Model Context Protocol) server registry monorepo. Project name: **mcp-nova**.
 
-**Purpose**: Syncs with the official MCP registry, supports adding private servers, and manages runtime MCP server processes via PM2.
+**Purpose**: Syncs with the official MCP registry, supports private server catalog, manages MCP server processes via PM2, and runs AI agents using Mastra in-process.
 
-**Two apps**:
-- `apps/backend`: Express.js + TypeScript (ESM) + SQLite (better-sqlite3) API
-- `apps/frontend`: SvelteKit 5 + Tailwind CSS v4 dashboard
+**4 apps + 1 shared package**:
+| Workspace | Package | Port | Purpose |
+|-----------|---------|------|---------|
+| `apps/registry` | `@mcp-nova/registry` | 3000 | MCP server catalog — official sync + private servers + skills |
+| `apps/runtime` | `@mcp-nova/runtime` | 3001 | PM2-managed MCP server process lifecycle |
+| `apps/agent-runtime` | `@mcp-nova/agent-runtime` | 3027 | Mastra in-process AI agents — create, start, stop, invoke, stream |
+| `apps/frontend` | `@mcp-nova/frontend` | 5173 | SvelteKit 5 admin dashboard |
+| `packages/types` | `@mcp-nova/types` | — | Shared Zod schemas + TypeScript types |
 
-**Why**: Personal/NTT DATA internal tool for managing a catalog of MCP servers and running them locally via PM2.
+**Key architectural decisions**:
+- `agent-runtime` uses Mastra **in-process** — no PM2 per agent, agents cached in `AgentInvokerService.agentCache`
+- SQLite (better-sqlite3, synchronous) across all backend apps
+- `apps/registry` is the source of truth for MCP servers and skills; `source='official'` rows are immutable
+- Frontend proxies API calls to backends (Vite dev proxy or nginx in prod)
+- `packages/types` hosts shared Zod schemas — backends and frontend should import from there
 
-**How to apply**: All new features should follow the separation between "catalog" (what MCPs exist) and "runtime" (what MCPs are running). Backend is synchronous DB only.
+**Current focus**: agent-runtime Mastra integration — lifecycle, composition, invocation history, streaming.

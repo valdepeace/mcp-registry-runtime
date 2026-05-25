@@ -41,6 +41,9 @@
             <a href="/admin/pm2" class="text-sm text-gray-600 hover:text-gray-900">
               PM2
             </a>
+            <a href="/admin/ollama" class="text-sm text-gray-600 hover:text-gray-900">
+              Ollama
+            </a>
             <button
               type="button"
               onclick={() => auth.logout()}

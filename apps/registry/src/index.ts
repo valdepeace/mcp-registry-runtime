@@ -5,7 +5,7 @@ import cors from 'cors';
 import bcrypt from 'bcryptjs';
 import { config } from './config/index.js';
 import { publicRoutes, adminRoutes } from './routes/index.js';
-import { syncService, databaseService } from './services/index.js';
+import { syncService, databaseService, seedBuiltInAgents } from './services/index.js';
 
 const app = express();
 
@@ -109,6 +109,9 @@ async function bootstrap() {
     databaseService.createUser(config.adminUsername, hash);
     console.log(`[Bootstrap] Created admin user: ${config.adminUsername}`);
   }
+
+  // Seed built-in agents (idempotent upsert)
+  seedBuiltInAgents();
 
   // Start sync service
   syncService.startPeriodicSync();

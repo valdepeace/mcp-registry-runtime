@@ -74,7 +74,7 @@
   <div class="grid grid-cols-2 gap-4">
     <div>
       <label for="serverName" class="block text-sm font-medium text-gray-700 mb-1">
-        Server Name <span class="text-red-500">*</span>
+        MCP Name <span class="text-red-500">*</span>
       </label>
       <input
         id="serverName"

@@ -10,6 +10,7 @@ import {
   databaseService,
   agentComposerService,
   agentInvokerService,
+  AgentRuntimeError,
 } from '../services/index.js';
 
 const router = Router();
@@ -23,11 +24,28 @@ const CreateInstanceSchema = z.object({
   exec_cmd: z.string().max(500).optional(),
   exec_args: z.array(z.string()).optional(),
   env_json: z.record(z.string()).optional(),
+  auto_start: z.boolean().optional().default(false),
 });
 
 const InvokeAgentSchema = z.object({
   input: z.string().min(1),
 });
+
+function sendAgentRuntimeError(res: Response, err: unknown, fallback: string): void {
+  if (err instanceof AgentRuntimeError) {
+    const status = err.code === 'not_found'
+      ? 404
+      : err.code === 'invalid_state'
+        ? 409
+        : err.code === 'composition_failed'
+          ? 422
+          : 500;
+    res.status(status).json({ error: err.message, code: err.code });
+    return;
+  }
+
+  res.status(500).json({ error: fallback });
+}
 
 /**
  * GET /admin/agent-runtime/instances
@@ -50,7 +68,7 @@ router.post(
       res.status(201).json({ instance });
     } catch (err) {
       console.error('[AgentRuntime] Create instance failed:', err);
-      res.status(500).json({ error: 'Failed to create agent instance' });
+      sendAgentRuntimeError(res, err, 'Failed to create agent instance');
     }
     return;
   }
@@ -96,7 +114,7 @@ router.post('/instances/:id/start', async (req: AuthenticatedRequest, res: Respo
     res.json({ instance });
   } catch (err) {
     console.error('[AgentRuntime] Start instance failed:', err);
-    res.status(500).json({ error: 'Failed to start agent instance' });
+    sendAgentRuntimeError(res, err, 'Failed to start agent instance');
   }
   return;
 });
@@ -110,7 +128,7 @@ router.post('/instances/:id/stop', async (req: AuthenticatedRequest, res: Respon
     res.json({ instance });
   } catch (err) {
     console.error('[AgentRuntime] Stop instance failed:', err);
-    res.status(500).json({ error: 'Failed to stop agent instance' });
+    sendAgentRuntimeError(res, err, 'Failed to stop agent instance');
   }
   return;
 });
@@ -127,7 +145,51 @@ router.post(
       res.json(result);
     } catch (err) {
       console.error('[AgentRuntime] Invoke agent failed:', err);
-      res.status(500).json({ error: 'Failed to invoke agent' });
+      sendAgentRuntimeError(res, err, 'Failed to invoke agent');
+    }
+    return;
+  }
+);
+
+/**
+ * POST /admin/agent-runtime/instances/:id/invoke/stream
+ * SSE streaming invoke — streams tokens in AI SDK v5 compatible format.
+ */
+router.post(
+  '/instances/:id/invoke/stream',
+  validateBody(InvokeAgentSchema),
+  async (req: AuthenticatedRequest, res: Response) => {
+    try {
+      agentInvokerService.getCachedOnlineAgent(req.params.id as string);
+
+      res.setHeader('Content-Type', 'text/event-stream');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+      res.flushHeaders();
+
+      try {
+        await agentInvokerService.invokeAgentStream(req.params.id as string, req.body.input, {
+          onTextDelta: (chunk) => {
+            res.write(`data: ${JSON.stringify({ type: 'text-delta', textDelta: chunk })}\n\n`);
+          },
+        });
+
+        res.write(`data: ${JSON.stringify({ type: 'finish', finishReason: 'stop', usage: { completionTokens: 0, promptTokens: 0 } })}\n\n`);
+        res.end();
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Unknown error';
+
+        res.write(`data: ${JSON.stringify({ type: 'error', error: message })}\n\n`);
+        res.end();
+      }
+    } catch (err) {
+      if (!res.headersSent) {
+        sendAgentRuntimeError(res, err, 'Stream invoke failed');
+      } else {
+        const message = err instanceof Error ? err.message : 'Stream invoke failed';
+        res.write(`data: ${JSON.stringify({ type: 'error', error: message })}\n\n`);
+        res.end();
+      }
     }
     return;
   }

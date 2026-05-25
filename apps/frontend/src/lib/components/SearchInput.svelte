@@ -6,7 +6,7 @@
     oninput?: (value: string) => void;
   }
 
-  let { value = $bindable(), placeholder = 'Search servers...', loading = false, oninput }: Props = $props();
+  let { value = $bindable(), placeholder = 'Search MCPs...', loading = false, oninput }: Props = $props();
 
   function handleInput(e: Event) {
     const target = e.target as HTMLInputElement;

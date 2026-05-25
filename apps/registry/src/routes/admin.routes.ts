@@ -7,6 +7,7 @@ import { CreateServerSchema, UpdateServerSchema, CreateSkillSchema, UpdateSkillS
 import { config } from '../config/index.js';
 import { z } from 'zod';
 import type { Package, RemoteTransport } from '@mcp-nova/types';
+import { syncEventBus } from '../services/sync-event-bus.js';
 
 const router = Router();
 
@@ -78,6 +79,153 @@ router.post('/sync/trigger', async (_req: AuthenticatedRequest, res: Response) =
 });
 
 /**
+ * GET /admin/sync/providers
+ * List all configured registry providers with stats
+ */
+router.get('/sync/providers', (_req: AuthenticatedRequest, res: Response) => {
+  const providers = syncService.getProviders();
+  res.json({ providers });
+  return;
+});
+
+/**
+ * POST /admin/sync/trigger/:type
+ * Trigger sync for a specific entity type (servers | skills | agents)
+ */
+router.post('/sync/trigger/:type', async (req: AuthenticatedRequest, res: Response) => {
+  const type = req.params.type as string;
+  if (!['servers', 'skills', 'agents'].includes(type)) {
+    res.status(400).json({ error: 'Invalid type. Use: servers, skills, agents' });
+    return;
+  }
+  syncService.syncByType(type as 'servers' | 'skills' | 'agents').catch(
+    err => console.error(`[Admin] Manual ${type} sync failed:`, err),
+  );
+  res.json({ message: `${type} sync triggered`, status: 'syncing' });
+  return;
+});
+
+/**
+ * POST /admin/sync/trigger/:type/:providerName
+ * Trigger sync for a single provider
+ */
+router.post('/sync/trigger/:type/:providerName', async (req: AuthenticatedRequest, res: Response) => {
+  const type = req.params.type as string;
+  const providerName = decodeURIComponent(req.params.providerName as string);
+  if (!['servers', 'skills', 'agents'].includes(type)) {
+    res.status(400).json({ error: 'Invalid type' });
+    return;
+  }
+  syncService.syncProvider(type as 'servers' | 'skills' | 'agents', providerName).catch(
+    err => console.error(`[Admin] Manual sync ${type}/${providerName} failed:`, err),
+  );
+  res.json({ message: `${type}/${providerName} sync triggered`, status: 'syncing' });
+  return;
+});
+
+/**
+ * GET /admin/sync/events
+ * SSE stream for real-time sync status updates.
+ * Auth via JWT in query param (EventSource can't set headers).
+ */
+router.get('/sync/events', (req: AuthenticatedRequest, res: Response) => {
+  const token = (req.query.token as string) || req.headers.authorization?.replace('Bearer ', '');
+  if (!token) {
+    res.status(401).json({ error: 'Missing token' });
+    return;
+  }
+  try {
+    jwt.verify(token, config.jwtSecret);
+  } catch {
+    res.status(401).json({ error: 'Invalid token' });
+    return;
+  }
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no',
+  });
+
+  res.write(`event: connected\ndata: ${JSON.stringify({ timestamp: new Date().toISOString() })}\n\n`);
+
+  const heartbeat = setInterval(() => {
+    res.write(`: heartbeat\n\n`);
+  }, 30000);
+
+  const listener = (event: { type: string; providerName: string; entityType: string; timestamp: string; count?: number; error?: string }) => {
+    res.write(`event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`);
+  };
+  syncEventBus.onSync(listener);
+
+  const cleanup = () => {
+    clearInterval(heartbeat);
+    syncEventBus.off('sync', listener);
+  };
+  req.on('close', cleanup);
+  req.on('error', cleanup);
+  return;
+});
+
+/**
+ * POST /admin/servers/clone
+ * Clone a registry server to private
+ */
+router.post('/servers/clone', async (req: AuthenticatedRequest, res: Response) => {
+  const { name, version } = req.body;
+  if (!name || !version) {
+    res.status(400).json({ error: 'name and version are required' });
+    return;
+  }
+  const cloned = databaseService.cloneServer(name, version);
+  if (!cloned) {
+    res.status(404).json({ error: 'Server not found or is already private' });
+    return;
+  }
+  res.json({ server: cloned });
+  return;
+});
+
+/**
+ * POST /admin/skills/clone
+ * Clone a registry skill to private
+ */
+router.post('/skills/clone', async (req: AuthenticatedRequest, res: Response) => {
+  const { name, version } = req.body;
+  if (!name || !version) {
+    res.status(400).json({ error: 'name and version are required' });
+    return;
+  }
+  const cloned = databaseService.cloneSkill(name, version);
+  if (!cloned) {
+    res.status(404).json({ error: 'Skill not found or is already private' });
+    return;
+  }
+  res.json({ skill: cloned });
+  return;
+});
+
+/**
+ * POST /admin/agents/clone
+ * Clone a registry agent to private
+ */
+router.post('/agents/clone', async (req: AuthenticatedRequest, res: Response) => {
+  const { name, version } = req.body;
+  if (!name || !version) {
+    res.status(400).json({ error: 'name and version are required' });
+    return;
+  }
+  const cloned = databaseService.cloneAgent(name, version);
+  if (!cloned) {
+    res.status(404).json({ error: 'Agent not found or is already private' });
+    return;
+  }
+  res.json({ agent: cloned, message: `Cloned as ${cloned.agent.name}@${cloned.agent.version}` });
+  return;
+});
+
+/**
  * POST /admin/servers
  * Create a new server (private or azure-devops)
  */
@@ -95,6 +243,7 @@ router.post(
 
     const serverResponse = {
       server: serverDetail,
+      origin: source,
       _meta: {
         'io.modelcontextprotocol.registry/private': {
           createdBy: req.user?.username,
@@ -103,7 +252,7 @@ router.post(
       },
     };
 
-    databaseService.upsertServer(serverResponse, source);
+    databaseService.upsertServer(serverResponse, source, '');
 
     res.status(201).json({ ...serverResponse, source });
     return;
@@ -136,6 +285,7 @@ router.put(
 
     const updatedServer = {
       server: { ...existing.server, ...updates, name: serverName, version },
+      origin: existing.origin ?? existing.source ?? 'private',
       _meta: {
         ...existing._meta,
         'io.modelcontextprotocol.registry/private': {
@@ -146,7 +296,7 @@ router.put(
       },
     };
 
-    databaseService.upsertServer(updatedServer, 'private');
+    databaseService.upsertServer(updatedServer, 'private', '');
 
     res.json(updatedServer);
     return;
@@ -268,7 +418,7 @@ router.post(
       },
     };
 
-    databaseService.upsertSkill(skillResponse, source);
+    databaseService.upsertSkill(skillResponse, source, '');
 
     res.status(201).json({ ...skillResponse, source });
     return;
@@ -310,7 +460,7 @@ router.put(
       },
     };
 
-    databaseService.upsertSkill(updatedSkill, 'private');
+    databaseService.upsertSkill(updatedSkill, 'private', '');
 
     res.json(updatedSkill);
     return;

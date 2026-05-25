@@ -1,0 +1,202 @@
+<script lang="ts">
+  import { api } from '$lib/api/client';
+  import type { AgentResponse } from '$lib/types';
+
+  interface Props {
+    value: string;
+    onSelect: (agent: AgentResponse | null) => void;
+    placeholder?: string;
+    disabled?: boolean;
+    source?: 'registry' | 'private' | 'all';
+  }
+
+  let {
+    value = $bindable(),
+    onSelect,
+    placeholder = 'Search agents...',
+    disabled = false,
+    source = 'registry',
+  }: Props = $props();
+
+  let query = $state('');
+  let results = $state<AgentResponse[]>([]);
+  let loading = $state(false);
+  let open = $state(false);
+  let highlightedIndex = $state(-1);
+  let inputRef: HTMLInputElement;
+  let debounceTimer: ReturnType<typeof setTimeout>;
+
+  $effect(() => {
+    if (value && !query) {
+      query = value;
+    }
+  });
+
+  async function search(searchQuery: string) {
+    if (!searchQuery || searchQuery.length < 2) {
+      results = [];
+      return;
+    }
+
+    loading = true;
+    try {
+      const response = await api.listAgents({ search: searchQuery, limit: 50, source });
+      results = response.agents.slice(0, 20);
+    } catch (e) {
+      console.error('[AgentCombobox] Search failed:', e);
+      results = [];
+    } finally {
+      loading = false;
+    }
+  }
+
+  function handleInput(e: Event) {
+    const target = e.target as HTMLInputElement;
+    query = target.value;
+    value = '';
+    onSelect(null);
+    highlightedIndex = -1;
+
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      search(query);
+      open = true;
+    }, 300);
+  }
+
+  function handleSelect(agent: AgentResponse) {
+    query = `${agent.agent.name}@${agent.agent.version}`;
+    value = query;
+    onSelect(agent);
+    open = false;
+    results = [];
+  }
+
+  function handleFocus() {
+    if (query.length >= 2) {
+      search(query);
+      open = true;
+    }
+  }
+
+  function handleBlur() {
+    setTimeout(() => {
+      open = false;
+    }, 200);
+  }
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (!open || results.length === 0) {
+      if (e.key === 'ArrowDown' && query.length >= 2) {
+        search(query);
+        open = true;
+      }
+      return;
+    }
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        highlightedIndex = Math.min(highlightedIndex + 1, results.length - 1);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        highlightedIndex = Math.max(highlightedIndex - 1, 0);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (highlightedIndex >= 0 && results[highlightedIndex]) {
+          handleSelect(results[highlightedIndex]);
+        }
+        break;
+      case 'Escape':
+        open = false;
+        highlightedIndex = -1;
+        break;
+    }
+  }
+
+  function clear() {
+    query = '';
+    value = '';
+    results = [];
+    onSelect(null);
+    inputRef?.focus();
+  }
+</script>
+
+<div class="relative">
+  <div class="relative">
+    <input
+      bind:this={inputRef}
+      type="text"
+      value={query}
+      oninput={handleInput}
+      onfocus={handleFocus}
+      onblur={handleBlur}
+      onkeydown={handleKeydown}
+      {placeholder}
+      {disabled}
+      class="w-full border border-gray-300 rounded px-3 py-2 pr-8 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
+      role="combobox"
+      aria-expanded={open}
+      aria-controls="agent-listbox"
+      aria-autocomplete="list"
+    />
+
+    {#if query}
+      <button
+        type="button"
+        onclick={clear}
+        class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+        aria-label="Clear"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+        </svg>
+      </button>
+    {/if}
+  </div>
+
+  {#if open && (results.length > 0 || loading)}
+    <ul
+      id="agent-listbox"
+      role="listbox"
+      class="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-72 overflow-auto"
+    >
+      {#if loading}
+        <li class="px-3 py-2 text-sm text-gray-500">Searching...</li>
+      {:else}
+        {#each results as agent, index (`${agent.agent.name}@${agent.agent.version}`)}
+          <li
+            role="option"
+            aria-selected={highlightedIndex === index}
+            class="px-3 py-2 cursor-pointer text-sm hover:bg-blue-50 {highlightedIndex === index ? 'bg-blue-100' : ''}"
+            onmousedown={() => handleSelect(agent)}
+            onmouseenter={() => highlightedIndex = index}
+          >
+            <div class="flex items-start justify-between gap-3">
+              <div class="min-w-0">
+                <div class="font-medium text-gray-900 break-all">{agent.agent.name}</div>
+                {#if agent.agent.description}
+                  <div class="text-xs text-gray-500 truncate">{agent.agent.description}</div>
+                {/if}
+              </div>
+              <div class="text-xs text-gray-400 whitespace-nowrap">v{agent.agent.version}</div>
+            </div>
+            <div class="flex gap-2 mt-1">
+              {#if agent.source}
+                <span class="text-xs px-1.5 py-0.5 bg-gray-100 rounded capitalize">{agent.source}</span>
+              {/if}
+              <span class="text-xs px-1.5 py-0.5 bg-gray-100 rounded">{agent.agent.subagent_type}</span>
+            </div>
+          </li>
+        {/each}
+      {/if}
+    </ul>
+  {/if}
+
+  {#if query.length > 0 && query.length < 2 && !value}
+    <p class="text-xs text-gray-500 mt-1">Type at least 2 characters to search</p>
+  {/if}
+</div>

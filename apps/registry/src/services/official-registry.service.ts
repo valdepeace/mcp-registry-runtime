@@ -1,27 +1,46 @@
 import type { ServerListResponse, ServerResponse, ListServersParams } from '@mcp-nova/types';
 import { ServerListResponseSchema } from '@mcp-nova/types';
 import { config } from '../config/index.js';
+import { SmitheryServersProvider, type ServersProvider } from './providers/index.js';
 
 /**
- * Service to interact with the official MCP registry
+ * Service to interact with the official MCP registry and additional server providers.
  */
 export class OfficialRegistryService {
   private baseUrl: string;
+  private extraProviders: ServersProvider[];
 
   constructor() {
     this.baseUrl = config.officialRegistryUrl;
+    this.extraProviders = [];
+    this.initProviders();
+  }
+
+  private initProviders(): void {
+    this.extraProviders.push(new SmitheryServersProvider());
+  }
+
+  get isConfigured(): boolean {
+    return this.baseUrl.length > 0;
+  }
+
+  get providerNames(): string[] {
+    const names = ['mcp-official'];
+    for (const p of this.extraProviders) names.push(p.name);
+    return names;
   }
 
   /**
-   * Fetch all servers from official registry with pagination
+   * Fetch all servers from the official MCP registry with pagination.
    */
-  async fetchAllServers(): Promise<ServerResponse[]> {
+  async fetchAllServers(onProgress?: (msg: string, current?: number, total?: number) => void): Promise<ServerResponse[]> {
     const allServers: ServerResponse[] = [];
     let cursor: string | undefined;
     let page = 0;
 
     do {
       page++;
+      onProgress?.(`Fetching page ${page}...`, page);
       console.log(`[OfficialRegistry] Fetching page ${page}${cursor ? ` (cursor: ${cursor})` : ''}`);
       const response = await this.listServers({ cursor, limit: 100 });
       console.log(`[OfficialRegistry] Page ${page}: ${response.servers.length} servers`);
@@ -29,8 +48,32 @@ export class OfficialRegistryService {
       cursor = response.metadata?.nextCursor;
     } while (cursor);
 
-    console.log(`[OfficialRegistry] Total fetched: ${allServers.length} servers`);
+    console.log(`[OfficialRegistry] Total fetched from official: ${allServers.length} servers`);
     return allServers;
+  }
+
+  /**
+   * Fetch servers from all additional providers (Smithery, etc.).
+   * Returns results per provider for audit/logging.
+   */
+  async fetchAllFromProviders(onProgress?: (msg: string, current?: number, total?: number) => void): Promise<{ servers: ServerResponse[]; results: Array<{ provider: string; count: number; error?: string }> }> {
+    const allServers: ServerResponse[] = [];
+    const results: Array<{ provider: string; count: number; error?: string }> = [];
+
+    for (const provider of this.extraProviders) {
+      try {
+        console.log(`[OfficialRegistry] Fetching from provider: ${provider.name}`);
+        const servers = await provider.fetchAllServers(onProgress);
+        allServers.push(...servers);
+        results.push({ provider: provider.name, count: servers.length });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Unknown error';
+        console.error(`[OfficialRegistry] Provider ${provider.name} failed:`, msg);
+        results.push({ provider: provider.name, count: 0, error: msg });
+      }
+    }
+
+    return { servers: allServers, results };
   }
 
   /**
@@ -50,6 +93,7 @@ export class OfficialRegistryService {
       headers: {
         'Accept': 'application/json',
       },
+      signal: AbortSignal.timeout(30000),
     });
 
     if (!response.ok) {
@@ -75,6 +119,7 @@ export class OfficialRegistryService {
       headers: {
         'Accept': 'application/json',
       },
+      signal: AbortSignal.timeout(30000),
     });
 
     if (!response.ok) {
@@ -100,6 +145,7 @@ export class OfficialRegistryService {
       headers: {
         'Accept': 'application/json',
       },
+      signal: AbortSignal.timeout(30000),
     });
 
     if (!response.ok) {

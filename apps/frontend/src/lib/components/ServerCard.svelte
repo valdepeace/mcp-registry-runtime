@@ -1,7 +1,9 @@
 <script lang="ts">
   import type { ServerResponse, NovaMeta, PrivateMeta } from '$lib/types';
   import { NOVA_META_NAMESPACE } from '$lib/types';
+  import { api } from '$lib/api/client';
   import Chip from './Chip.svelte';
+  import LaunchModal from './LaunchModal.svelte';
 
   interface Props {
     server: ServerResponse;
@@ -11,6 +13,8 @@
   let { server, highlight = false }: Props = $props();
 
   let expanded = $state(false);
+  let cloneMessage = $state<string | null>(null);
+  let launchOpen = $state(false);
 
   const meta = $derived(server._meta?.['io.modelcontextprotocol.registry/official']);
   const privateMeta = $derived(server._meta?.['io.modelcontextprotocol.registry/private'] as PrivateMeta | undefined);
@@ -19,6 +23,37 @@
   const isVendorOfficial = $derived(novaMeta?.vendorOfficial === true);
   const isPrivate = $derived(server.source === 'private');
   const isAzureDevops = $derived(server.source === 'azure-devops');
+
+  const originLabel = $derived(formatOrigin(server.origin));
+
+  function formatOrigin(origin: string | undefined): string | null {
+    if (!origin) return null;
+    if (origin === 'mcp-official') return 'MCP Registry';
+    if (origin === 'smithery-servers') return 'Smithery';
+    if (origin === 'private') return 'Private';
+    if (origin === 'azure-devops') return 'Azure DevOps';
+    return origin;
+  }
+
+  function originVariant(origin: string | undefined): 'primary' | 'success' | 'info' | 'purple' | 'default' {
+    if (!origin) return 'default';
+    if (origin === 'mcp-official') return 'info';
+    if (origin === 'smithery-servers') return 'success';
+    if (origin === 'private') return 'purple';
+    if (origin === 'azure-devops') return 'primary';
+    return 'default';
+  }
+
+  async function cloneToPrivate(e: Event) {
+    e.stopPropagation();
+    try {
+      await api.cloneServer(server.server.name, server.server.version);
+      cloneMessage = 'Cloned to private!';
+      setTimeout(() => cloneMessage = null, 3000);
+    } catch (err) {
+      cloneMessage = 'Clone failed';
+    }
+  }
 
   function formatDate(dateStr: string | undefined): string {
     if (!dateStr) return '-';
@@ -44,7 +79,21 @@
     if (hint.includes('go')) {
       return { lang: 'Go', variant: 'info' };
     }
+    if (hint.includes('java') || hint.includes('mvn')) {
+      return { lang: 'Java', variant: 'warning' };
+    }
+    if (hint.includes('cargo') || hint.includes('rust')) {
+      return { lang: 'Rust', variant: 'info' };
+    }
     return null;
+  }
+
+  function transportVariant(type: string | undefined): 'primary' | 'success' | 'info' | 'default' {
+    if (!type) return 'default';
+    if (type === 'stdio') return 'success';
+    if (type === 'streamable-http') return 'info';
+    if (type === 'sse') return 'primary';
+    return 'default';
   }
 
   const registryTypes = $derived(
@@ -58,9 +107,12 @@
     ].filter(Boolean))]
   );
 
+  const hasPackages = $derived((server.server.packages?.length ?? 0) > 0);
+  const canLaunch = $derived(hasPackages || !!server.server.repository?.url);
+
   const inferredLang = $derived(
-    server.server.packages?.[0]?.runtimeHint
-      ? inferLanguage(server.server.packages[0].runtimeHint)
+    server.server.packages?.find(p => p.runtimeHint)?.runtimeHint
+      ? inferLanguage(server.server.packages.find(p => p.runtimeHint)!.runtimeHint!)
       : null
   );
 </script>
@@ -97,6 +149,16 @@
         <span class="text-xs text-gray-500 font-medium whitespace-nowrap">
           v{server.server.version}
         </span>
+        {#if canLaunch}
+          <button
+            type="button"
+            onclick={(e) => { e.stopPropagation(); launchOpen = true; }}
+            class="text-xs px-2 py-1 rounded font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
+            title="Launch this MCP"
+          >
+            Launch
+          </button>
+        {/if}
       </div>
     </div>
 
@@ -106,26 +168,28 @@
 
     <!-- Chips row -->
     <div class="flex flex-wrap items-center gap-1.5 mb-2">
-      {#if isOfficial}
+      {#if originLabel}
+        <Chip variant={originVariant(server.origin)} icon="🌐">{originLabel}</Chip>
+      {:else if isOfficial}
         <Chip variant="success">Registry</Chip>
       {/if}
       {#if isVendorOfficial}
         <Chip variant="warning">Vendor official</Chip>
       {/if}
-      {#if isPrivate}
+      {#if isPrivate && !originLabel}
         <Chip variant="purple">Private</Chip>
       {/if}
-      {#if isAzureDevops}
+      {#if isAzureDevops && !originLabel}
         <Chip variant="primary">Azure DevOps</Chip>
       {/if}
       {#if inferredLang}
         <Chip variant={inferredLang.variant}>{inferredLang.lang}</Chip>
       {/if}
+      {#each transportTypes as transport}
+        <Chip variant={transportVariant(transport)}>{transport}</Chip>
+      {/each}
       {#each registryTypes as registry}
         <Chip variant="info">{registry}</Chip>
-      {/each}
-      {#each transportTypes as transport}
-        <Chip variant="success">{transport}</Chip>
       {/each}
       {#if novaMeta?.category}
         <Chip variant="primary">{novaMeta.category}</Chip>
@@ -141,6 +205,10 @@
     <div class="text-xs text-gray-500">
       {formatDate(meta?.updatedAt || meta?.publishedAt || privateMeta?.updatedAt || privateMeta?.createdAt)}
     </div>
+
+    {#if cloneMessage}
+      <div class="text-xs text-green-600 mt-1">{cloneMessage}</div>
+    {/if}
   </div>
 
   <!-- Expanded Details -->
@@ -150,6 +218,18 @@
         <div>
           <span class="font-medium">Title:</span>
           <span class="break-all">{server.server.title}</span>
+        </div>
+      {/if}
+
+      <div>
+        <span class="font-medium">Origin:</span>
+        <span>{originLabel ?? '—'}</span>
+      </div>
+
+      {#if server.provider_name}
+        <div>
+          <span class="font-medium">Provider:</span>
+          <span>{server.provider_name}</span>
         </div>
       {/if}
 
@@ -229,6 +309,9 @@
         >
           View details →
         </a>
+        {#if isOfficial}
+          <button onclick={cloneToPrivate} class="text-green-600 hover:underline text-sm">Clone to Private</button>
+        {/if}
         <details>
           <summary class="cursor-pointer text-gray-500 hover:text-gray-700">View JSON</summary>
           <pre class="mt-2 p-3 bg-gray-100 rounded text-xs overflow-x-auto break-all">{JSON.stringify(server, null, 2)}</pre>
@@ -237,3 +320,5 @@
     </div>
   {/if}
 </div>
+
+<LaunchModal open={launchOpen} {server} onClose={() => launchOpen = false} />

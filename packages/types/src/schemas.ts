@@ -33,7 +33,7 @@ export const StdioTransportSchema = z.object({
 
 export const StreamableHttpTransportSchema = z.object({
   type: z.literal('streamable-http'),
-  url: z.string().url(),
+  url: z.string(),
   headers: z.array(z.object({
     name: z.string(),
     value: z.string().optional(),
@@ -43,7 +43,7 @@ export const StreamableHttpTransportSchema = z.object({
 
 export const SseTransportSchema = z.object({
   type: z.literal('sse'),
-  url: z.string().url(),
+  url: z.string(),
   headers: z.array(z.object({
     name: z.string(),
     value: z.string().optional(),
@@ -61,7 +61,7 @@ export const LocalTransportSchema = z.discriminatedUnion('type', [
 export const InputSchema = z.object({
   description: z.string().optional(),
   isRequired: z.boolean().optional(),
-  format: z.enum(['string', 'number', 'boolean', 'filepath']).optional(),
+  format: z.string().optional(),
   value: z.string().optional(),
   isSecret: z.boolean().optional(),
   default: z.string().optional(),
@@ -88,31 +88,42 @@ export const NamedArgumentSchema = InputSchema.extend({
   variables: z.record(InputSchema).optional(),
 });
 
-export const ArgumentSchema = z.discriminatedUnion('type', [
-  PositionalArgumentSchema,
-  NamedArgumentSchema,
-]);
+export const ArgumentSchema = z.object({
+  type: z.string().optional(),
+  description: z.string().optional(),
+  isRequired: z.boolean().optional(),
+  format: z.string().optional(),
+  value: z.string().optional(),
+  isSecret: z.boolean().optional(),
+  default: z.string().optional(),
+  placeholder: z.string().optional(),
+  choices: z.array(z.string()).optional(),
+  name: z.string().optional(),
+  valueHint: z.string().optional(),
+  isRepeated: z.boolean().optional(),
+  variables: z.record(z.unknown()).optional(),
+}).passthrough();
 
 // Repository schema
 export const RepositorySchema = z.object({
-  url: z.string().url(),
-  source: z.string(),
+  url: z.string().optional(),
+  source: z.string().optional(),
   id: z.string().optional(),
   subfolder: z.string().optional(),
 });
 
 // Icon schema
 export const IconSchema = z.object({
-  src: z.string().url(),
-  mimeType: z.enum(['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml', 'image/webp']).optional(),
+  src: z.string(),
+  mimeType: z.string().optional(),
   sizes: z.array(z.string()).optional(),
-  theme: z.enum(['light', 'dark']).optional(),
+  theme: z.string().optional(),
 });
 
 // Package schema
 export const PackageSchema = z.object({
   registryType: z.string(),
-  registryBaseUrl: z.string().url().optional(),
+  registryBaseUrl: z.string().optional(),
   identifier: z.string(),
   version: z.string().optional(),
   fileSha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
@@ -136,16 +147,17 @@ export const RemoteTransportSchema = z.union([
 // Server Detail schema
 export const ServerDetailSchema = z.object({
   name: z.string()
-    .min(3)
-    .max(200)
-    .regex(/^[a-zA-Z0-9.-]+\/[a-zA-Z0-9._-]+$/),
-  description: z.string().min(1).max(100),
-  title: z.string().min(1).max(100).optional(),
+    .min(1)
+    .max(255)
+    .regex(/^[a-zA-Z0-9._-]+\/[a-zA-Z0-9._-]+$/),
+  description: z.string().min(1).max(2000),
+  title: z.string().min(1).max(200).optional(),
+  origin: z.string().max(100).optional(),
   repository: RepositorySchema.optional(),
   version: z.string().max(255),
-  websiteUrl: z.string().url().optional(),
+  websiteUrl: z.string().optional(),
   icons: z.array(IconSchema).optional(),
-  $schema: z.string().url().optional(),
+  $schema: z.string().optional(),
   packages: z.array(PackageSchema).optional(),
   remotes: z.array(RemoteTransportSchema).optional(),
   _meta: z.object({
@@ -171,6 +183,7 @@ export const ListServersQuerySchema = z.object({
   version: z.string().optional(),
   transport_type: z.enum(['stdio', 'streamable-http', 'sse']).optional(),
   source: z.enum(['registry', 'private', 'azure-devops', 'all']).optional().default('all'),
+  origin: z.string().optional(),
   category: ServerCategoryEnum.optional(),
   tags: z.string().optional(),
   verified: z.coerce.boolean().optional(),
@@ -185,6 +198,9 @@ export type ListServersQuery = z.infer<typeof ListServersQuerySchema>;
 // Response schemas for validating external API responses
 export const ServerResponseSchema = z.object({
   server: ServerDetailSchema,
+  source: z.enum(['registry', 'private', 'azure-devops']).optional(),
+  origin: z.string().optional(),
+  provider_name: z.string().optional(),
   _meta: z.record(z.unknown()).optional(),
 });
 

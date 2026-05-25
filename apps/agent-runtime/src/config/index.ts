@@ -17,6 +17,9 @@ const ConfigSchema = z.object({
     .default('*'),
   REGISTRY_URL: z.string().url().default('http://localhost:3000'),
   RUNTIME_URL: z.string().url().default('http://localhost:3001'),
+  MASTRA_MODEL: z.string().min(1).default('openai/gemma4'),
+  OPENAI_BASE_URL: z.string().url().optional(),
+  OLLAMA_URL: z.string().url().default('http://localhost:11434'),
 });
 
 const parseResult = ConfigSchema.safeParse(process.env);
@@ -45,4 +48,7 @@ export const config = {
   corsOrigins: validated.CORS_ORIGINS,
   registryUrl: validated.REGISTRY_URL,
   runtimeUrl: validated.RUNTIME_URL,
+  mastraModel: validated.MASTRA_MODEL,
+  openaiBaseUrl: validated.OPENAI_BASE_URL ?? undefined,
+  ollamaUrl: validated.OLLAMA_URL,
 };

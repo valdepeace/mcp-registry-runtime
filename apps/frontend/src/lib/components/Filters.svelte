@@ -6,8 +6,10 @@
     latestOnly: boolean;
     transportType: TransportType | '';
     source: ServerSource | 'all';
+    origin: string;
     category: ServerCategory | '';
     verified: boolean | null;
+    featured: boolean | null;
     vendorOfficial: boolean | null;
     onchange: () => void;
   }
@@ -16,8 +18,10 @@
     latestOnly = $bindable(),
     transportType = $bindable(),
     source = $bindable(),
+    origin = $bindable(),
     category = $bindable(),
     verified = $bindable(),
+    featured = $bindable(),
     vendorOfficial = $bindable(),
     onchange,
   }: Props = $props();
@@ -37,6 +41,11 @@
     onchange();
   }
 
+  function handleOriginChange(e: Event) {
+    origin = (e.target as HTMLSelectElement).value;
+    onchange();
+  }
+
   function handleCategoryChange(e: Event) {
     category = (e.target as HTMLSelectElement).value as ServerCategory | '';
     onchange();
@@ -48,6 +57,16 @@
       verified = null;
     } else {
       verified = value === 'true';
+    }
+    onchange();
+  }
+
+  function handleFeaturedChange(e: Event) {
+    const value = (e.target as HTMLSelectElement).value;
+    if (value === '') {
+      featured = null;
+    } else {
+      featured = value === 'true';
     }
     onchange();
   }
@@ -90,6 +109,22 @@
   </div>
 
   <div class="flex items-center gap-2">
+    <label for="origin-filter">Origin:</label>
+    <select
+      id="origin-filter"
+      value={origin}
+      onchange={handleOriginChange}
+      class="border border-gray-300 rounded px-2 py-1 text-sm"
+    >
+      <option value="">All</option>
+      <option value="mcp-official">MCP Registry</option>
+      <option value="smithery-servers">Smithery</option>
+      <option value="private">Private</option>
+      <option value="azure-devops">Azure DevOps</option>
+    </select>
+  </div>
+
+  <div class="flex items-center gap-2">
     <label for="source-filter">Source:</label>
     <select
       id="source-filter"
@@ -98,23 +133,9 @@
       class="border border-gray-300 rounded px-2 py-1 text-sm"
     >
       <option value="all">All</option>
-      <option value="registry">Registry (mcp.io)</option>
+      <option value="registry">Registry</option>
       <option value="private">Private</option>
       <option value="azure-devops">Azure DevOps</option>
-    </select>
-  </div>
-
-  <div class="flex items-center gap-2">
-    <label for="vendor-official-filter">Vendor official:</label>
-    <select
-      id="vendor-official-filter"
-      value={vendorOfficial === null ? '' : String(vendorOfficial)}
-      onchange={handleVendorOfficialChange}
-      class="border border-gray-300 rounded px-2 py-1 text-sm"
-    >
-      <option value="">All</option>
-      <option value="true">Official only</option>
-      <option value="false">Unofficial</option>
     </select>
   </div>
 
@@ -144,6 +165,34 @@
       <option value="">All</option>
       <option value="true">Verified only</option>
       <option value="false">Unverified only</option>
+    </select>
+  </div>
+
+  <div class="flex items-center gap-2">
+    <label for="featured-filter">Featured:</label>
+    <select
+      id="featured-filter"
+      value={featured === null ? '' : String(featured)}
+      onchange={handleFeaturedChange}
+      class="border border-gray-300 rounded px-2 py-1 text-sm"
+    >
+      <option value="">All</option>
+      <option value="true">Featured only</option>
+      <option value="false">Not featured</option>
+    </select>
+  </div>
+
+  <div class="flex items-center gap-2">
+    <label for="vendor-official-filter">Vendor official:</label>
+    <select
+      id="vendor-official-filter"
+      value={vendorOfficial === null ? '' : String(vendorOfficial)}
+      onchange={handleVendorOfficialChange}
+      class="border border-gray-300 rounded px-2 py-1 text-sm"
+    >
+      <option value="">All</option>
+      <option value="true">Official only</option>
+      <option value="false">Unofficial</option>
     </select>
   </div>
 </div>

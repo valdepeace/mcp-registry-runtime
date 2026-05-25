@@ -15,8 +15,10 @@
   let latestOnly = $state(true);
   let transportType = $state<TransportType | ''>('');
   let source = $state<ServerSource | 'all'>('all');
+  let origin = $state('');
   let category = $state<ServerCategory | ''>('');
   let verified = $state<boolean | null>(null);
+  let featured = $state<boolean | null>(null);
   let vendorOfficial = $state<boolean | null>(null);
 
   // Pagination
@@ -37,9 +39,11 @@
         search: search || undefined,
         transport_type: transportType || undefined,
         source,
+        origin: origin || undefined,
         version: latestOnly ? 'latest' : undefined,
         category: category || undefined,
         verified: verified ?? undefined,
+        featured: featured ?? undefined,
         vendor_official: vendorOfficial ?? undefined,
       });
 
@@ -116,14 +120,14 @@
 </script>
 
 <svelte:head>
-  <title>MCP Registry - Browse Servers</title>
+  <title>MCP Registry - Browse MCPs</title>
 </svelte:head>
 
 <div class="max-w-7xl mx-auto px-4 py-8 md:py-12">
   <!-- Header -->
   <header class="mb-8 pb-8 border-b">
     <h1 class="text-4xl font-bold text-gray-900 mb-2">MCP Registry</h1>
-    <p class="text-gray-600 text-lg mb-6">Discover Model Context Protocol servers</p>
+    <p class="text-gray-600 text-lg mb-6">Discover Model Context Protocol MCPs</p>
     <div class="flex gap-6 text-sm">
       <a
         href="https://github.com/modelcontextprotocol"
@@ -160,7 +164,7 @@
   <div class="mb-8 space-y-3">
     <SearchInput
       bind:value={search}
-      placeholder="Search servers by name..."
+      placeholder="Search MCPs by name..."
       loading={searchLoading}
       oninput={handleSearch}
     />
@@ -168,8 +172,10 @@
       bind:latestOnly
       bind:transportType
       bind:source
+      bind:origin
       bind:category
       bind:verified
+      bind:featured
       bind:vendorOfficial
       onchange={handleFilterChange}
     />
@@ -178,7 +184,7 @@
   <!-- Loading State -->
   {#if loading}
     <div class="text-center py-12 text-gray-600">
-      Loading servers...
+      Loading MCPs...
     </div>
   {:else if error}
     <!-- Error State -->
@@ -196,7 +202,7 @@
     <!-- Server List -->
     {#if servers.length === 0}
       <div class="text-center py-12 text-gray-600">
-        No servers found
+        No MCPs found
       </div>
     {:else}
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -209,7 +215,7 @@
       <Pagination
         hasPrevious={cursorHistory.length > 0}
         hasNext={!!nextCursor}
-        info={nextCursor ? `Showing ${servers.length} of ${total}` : `Showing ${servers.length} servers`}
+        info={nextCursor ? `Showing ${servers.length} of ${total}` : `Showing ${servers.length} MCPs`}
         onprevious={handlePrevious}
         onnext={handleNext}
       />

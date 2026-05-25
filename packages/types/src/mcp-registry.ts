@@ -33,7 +33,7 @@ export interface RemoteTransport extends Omit<StreamableHttpTransport | SseTrans
 export interface Input {
   description?: string;
   isRequired?: boolean;
-  format?: 'string' | 'number' | 'boolean' | 'filepath';
+  format?: string;
   value?: string;
   isSecret?: boolean;
   default?: string;
@@ -42,7 +42,7 @@ export interface Input {
 }
 
 export interface InputWithVariables extends Input {
-  variables?: Record<string, Input>;
+  variables?: Record<string, unknown>;
 }
 
 export interface KeyValueInput extends InputWithVariables {
@@ -50,23 +50,28 @@ export interface KeyValueInput extends InputWithVariables {
 }
 
 export interface PositionalArgument extends InputWithVariables {
-  type: 'positional';
+  type?: string;
   valueHint?: string;
   isRepeated?: boolean;
 }
 
 export interface NamedArgument extends InputWithVariables {
-  type: 'named';
-  name: string;
+  type?: string;
+  name?: string;
   isRepeated?: boolean;
 }
 
-export type Argument = PositionalArgument | NamedArgument;
+export type Argument = {
+  type?: string;
+  name?: string;
+  valueHint?: string;
+  [key: string]: unknown;
+};
 
 // Repository
 export interface Repository {
-  url: string;
-  source: string;
+  url?: string;
+  source?: string;
   id?: string;
   subfolder?: string;
 }
@@ -74,9 +79,9 @@ export interface Repository {
 // Icon
 export interface Icon {
   src: string;
-  mimeType?: 'image/png' | 'image/jpeg' | 'image/jpg' | 'image/svg+xml' | 'image/webp';
+  mimeType?: string;
   sizes?: string[];
-  theme?: 'light' | 'dark';
+  theme?: string;
 }
 
 // Package
@@ -98,6 +103,7 @@ export interface ServerDetail {
   name: string;
   description: string;
   title?: string;
+  origin?: string;
   repository?: Repository;
   version: string;
   websiteUrl?: string;
@@ -115,6 +121,8 @@ export interface ServerDetail {
 export interface ServerResponse {
   server: ServerDetail;
   source?: ServerSource;
+  origin?: string;
+  provider_name?: string;
   _meta?: {
     'io.modelcontextprotocol.registry/official'?: {
       status?: 'active' | 'deprecated' | 'deleted';

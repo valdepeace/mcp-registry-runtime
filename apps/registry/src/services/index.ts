@@ -3,3 +3,4 @@ export { skillsRegistryService } from './skills-registry.service.js';
 export { agentsRegistryService } from './agents-registry.service.js';
 export { databaseService, DatabaseService } from './database.service.js';
 export { syncService, SyncService } from './sync.service.js';
+export { seedBuiltInAgents } from './seed.service.js';

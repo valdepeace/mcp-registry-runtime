@@ -8,18 +8,22 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "concurrently --kill-others -n registry,runtime,ag-runtime,front -c blue,green,magenta,yellow \"npm --prefix apps/registry run dev\" \"npm --prefix apps/runtime run dev\" \"npm --prefix apps/agent-runtime run dev\" \"npm --prefix apps/frontend run dev\"",
-    "dev:registry": "npm --prefix apps/registry run dev",
-    "dev:runtime": "npm --prefix apps/runtime run dev",
-    "dev:agent-runtime": "npm --prefix apps/agent-runtime run dev",
-    "dev:frontend": "npm --prefix apps/frontend run dev",
-    "build": "npm --prefix apps/registry run build && npm --prefix apps/runtime run build && npm --prefix apps/agent-runtime run build && npm --prefix apps/frontend run build",
-    "build:registry": "npm --prefix apps/registry run build",
-    "build:runtime": "npm --prefix apps/runtime run build",
-    "build:agent-runtime": "npm --prefix apps/agent-runtime run build",
-    "build:frontend": "npm --prefix apps/frontend run build",
-    "start": "npm --prefix apps/registry run start",
-    "typecheck": "npm --prefix apps/registry run typecheck && npm --prefix apps/runtime run typecheck && npm --prefix apps/agent-runtime run typecheck && npm --prefix apps/frontend run typecheck"
+    "dev": "nx run-many -t dev --parallel=4",
+    "dev:registry": "nx run registry:dev",
+    "dev:runtime": "nx run runtime:dev",
+    "dev:agent-runtime": "nx run agent-runtime:dev",
+    "dev:frontend": "nx run frontend:dev",
+    "debug": "nx run-many -t debug -p registry,runtime,agent-runtime --parallel=3",
+    "debug:registry": "nx run registry:debug",
+    "debug:runtime": "nx run runtime:debug",
+    "debug:agent-runtime": "nx run agent-runtime:debug",
+    "build": "nx run-many -t build --parallel=4",
+    "build:registry": "nx run registry:build",
+    "build:runtime": "nx run runtime:build",
+    "build:agent-runtime": "nx run agent-runtime:build",
+    "build:frontend": "nx run frontend:build",
+    "start": "nx run registry:start",
+    "typecheck": "nx run-many -t typecheck --parallel=4"
   },
   "keywords": [
     "mcp",
@@ -28,6 +32,7 @@
   ],
   "license": "MIT",
   "devDependencies": {
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "nx": "22.7.3"
   }
 }

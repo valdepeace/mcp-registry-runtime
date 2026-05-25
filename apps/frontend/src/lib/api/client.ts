@@ -1,4 +1,8 @@
 import type {
+  OllamaStatus,
+  OllamaModel,
+  OllamaRunningModel,
+  OllamaPullEvent,
   ServerListResponse,
   ServerResponse,
   ListServersParams,
@@ -28,6 +32,7 @@ import type {
   AgentComposeResponse,
   AgentInvokeResponse,
   AgentInvocation,
+  AgentRuntimeHealth,
   SkillDetail,
   AgentDetail,
 } from '$lib/types';
@@ -98,9 +103,28 @@ class ApiClient {
 
       clearTimeout(timeout);
 
+      const contentType = response.headers.get('content-type') ?? '';
+      const isJson = contentType.includes('application/json');
+
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Request failed' }));
-        throw new Error(error.error || `HTTP ${response.status}`);
+        if (isJson) {
+          const error = await response.json().catch(() => ({ error: `HTTP ${response.status}` }));
+          throw new Error(error.error || `HTTP ${response.status}`);
+        }
+
+        const body = await response.text().catch(() => '');
+        const detail = body.includes('<!doctype html') || body.includes('<html')
+          ? 'received HTML instead of API JSON; check the dev proxy and backend process'
+          : body.slice(0, 160).trim();
+        throw new Error(`HTTP ${response.status}: ${detail || 'Request failed'}`);
+      }
+
+      if (!isJson) {
+        const body = await response.text().catch(() => '');
+        const detail = body.includes('<!doctype html') || body.includes('<html')
+          ? 'received HTML instead of API JSON; check the dev proxy and backend process'
+          : body.slice(0, 160).trim();
+        throw new Error(`Invalid API response from ${endpoint}: ${detail || contentType || 'empty response'}`);
       }
 
       return response.json();
@@ -123,6 +147,7 @@ class ApiClient {
     if (params.search) searchParams.set('search', params.search);
     if (params.transport_type) searchParams.set('transport_type', params.transport_type);
     if (params.source) searchParams.set('source', params.source);
+    if (params.origin) searchParams.set('origin', params.origin);
     if (params.version) searchParams.set('version', params.version);
     if (params.category) searchParams.set('category', params.category);
     if (params.tags) searchParams.set('tags', params.tags);
@@ -303,10 +328,10 @@ class ApiClient {
     });
   }
 
-  async createRuntimeFromCatalog(serverName: string, version?: string): Promise<RuntimeInstanceResponse & { detected: any }> {
+  async createRuntimeFromCatalog(serverName: string, version?: string, cloneRepo?: boolean, autoStart?: boolean): Promise<RuntimeInstanceResponse & { detected: any; message?: string }> {
     return this.request('/admin/runtime/instances/from-catalog', {
       method: 'POST',
-      body: JSON.stringify({ server_name: serverName, version })
+      body: JSON.stringify({ server_name: serverName, version, clone_repo: cloneRepo ?? false, auto_start: autoStart ?? false })
     });
   }
 
@@ -468,7 +493,11 @@ class ApiClient {
     return this.request<AgentInstanceListResponse>('/admin/agent-runtime/instances');
   }
 
-  async createAgentInstance(data: { agent_name: string; agent_version: string }): Promise<AgentInstanceResponse> {
+  async getAgentRuntimeHealth(): Promise<AgentRuntimeHealth> {
+    return this.request<AgentRuntimeHealth>('/admin/agent-runtime/health');
+  }
+
+  async createAgentInstance(data: { agent_name: string; agent_version: string; auto_start?: boolean; env_json?: Record<string, string> }): Promise<AgentInstanceResponse> {
     return this.request<AgentInstanceResponse>('/admin/agent-runtime/instances', {
       method: 'POST',
       body: JSON.stringify(data),
@@ -507,6 +536,103 @@ class ApiClient {
       method: 'POST',
       body: JSON.stringify({ agent_name: agentName, agent_version: agentVersion }),
     });
+  }
+
+  // ── Sync & Providers API ──────────────────────────────────────────
+
+  async getSyncProviders(): Promise<{ providers: Array<{ providerName: string; entityType: string; entityCount: number; lastSync: string | null; lastStatus: string; lastError: string | null; configured: boolean }> }> {
+    return this.request('/admin/sync/providers');
+  }
+
+  async triggerSyncByType(type: 'servers' | 'skills' | 'agents'): Promise<{ message: string }> {
+    return this.request(`/admin/sync/trigger/${type}`, { method: 'POST' });
+  }
+
+  async triggerSyncProvider(type: string, providerName: string): Promise<{ message: string }> {
+    return this.request(`/admin/sync/trigger/${type}/${encodeURIComponent(providerName)}`, { method: 'POST' });
+  }
+
+  // ── Clone API (registry → private) ───────────────────────────────
+
+  async cloneServer(name: string, version: string): Promise<{ server: any }> {
+    return this.request('/admin/servers/clone', {
+      method: 'POST',
+      body: JSON.stringify({ name, version }),
+    });
+  }
+
+  async cloneSkill(name: string, version: string): Promise<{ skill: any }> {
+    return this.request('/admin/skills/clone', {
+      method: 'POST',
+      body: JSON.stringify({ name, version }),
+    });
+  }
+
+  async cloneAgent(name: string, version: string): Promise<{ agent: AgentResponse; message?: string }> {
+    return this.request('/admin/agents/clone', {
+      method: 'POST',
+      body: JSON.stringify({ name, version }),
+    });
+  }
+
+  // ── Ollama API ────────────────────────────────────────────────────
+
+  async getOllamaStatus(): Promise<OllamaStatus> {
+    return this.request<OllamaStatus>('/admin/ollama/status');
+  }
+
+  async listOllamaModels(): Promise<{ models: OllamaModel[] }> {
+    return this.request<{ models: OllamaModel[] }>('/admin/ollama/models');
+  }
+
+  async listOllamaRunning(): Promise<{ models: OllamaRunningModel[] }> {
+    return this.request<{ models: OllamaRunningModel[] }>('/admin/ollama/ps');
+  }
+
+  async deleteOllamaModel(name: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/admin/ollama/models/${encodeURIComponent(name)}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async *pullOllamaModel(model: string): AsyncGenerator<OllamaPullEvent> {
+    const token = this.token;
+    const response = await fetch('/admin/ollama/pull', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ model }),
+    });
+
+    if (!response.ok) {
+      const text = await response.text();
+      yield { type: 'error', error: text || `HTTP ${response.status}` };
+      return;
+    }
+
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          try {
+            yield JSON.parse(line.slice(6)) as OllamaPullEvent;
+          } catch { /* skip malformed */ }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
   }
 }
 

@@ -16,6 +16,24 @@
   const privateMeta = $derived(server?._meta?.['io.modelcontextprotocol.registry/private'] as PrivateMeta | undefined);
   const isPrivate = $derived(server?.source === 'private');
 
+  function formatOrigin(origin: string | undefined): string {
+    if (!origin) return 'Unknown';
+    if (origin === 'mcp-official') return 'MCP Registry';
+    if (origin === 'smithery-servers') return 'Smithery';
+    if (origin === 'private') return 'Private';
+    if (origin === 'azure-devops') return 'Azure DevOps';
+    return origin;
+  }
+
+  function originColor(origin: string | undefined): string {
+    if (!origin) return 'bg-gray-100 text-gray-700';
+    if (origin === 'mcp-official') return 'bg-cyan-100 text-cyan-700';
+    if (origin === 'smithery-servers') return 'bg-green-100 text-green-700';
+    if (origin === 'private') return 'bg-purple-100 text-purple-700';
+    if (origin === 'azure-devops') return 'bg-blue-100 text-blue-700';
+    return 'bg-gray-100 text-gray-700';
+  }
+
   async function loadServer(version: string) {
     try {
       error = null;
@@ -74,16 +92,16 @@
 <div class="max-w-5xl mx-auto px-4 py-8">
   <!-- Breadcrumb -->
   <nav class="mb-6">
-    <a href="/" class="text-blue-600 hover:underline">← Back to servers</a>
+    <a href="/" class="text-blue-600 hover:underline">← Back to MCPs</a>
   </nav>
 
   {#if loading}
-    <div class="text-center py-12 text-gray-600">Loading server...</div>
+    <div class="text-center py-12 text-gray-600">Loading MCP...</div>
   {:else if error}
     <div class="bg-red-50 border border-red-200 rounded-lg p-6">
       <h2 class="text-lg font-semibold text-red-800 mb-2">Error</h2>
       <p class="text-red-700">{error}</p>
-      <a href="/" class="mt-4 inline-block text-blue-600 hover:underline">← Back to servers</a>
+      <a href="/" class="mt-4 inline-block text-blue-600 hover:underline">← Back to MCPs</a>
     </div>
   {:else if server}
     <!-- Header -->
@@ -92,15 +110,9 @@
         <div class="flex-1 min-w-0">
           <div class="flex items-center gap-3 mb-2">
             <h1 class="text-3xl font-bold text-gray-900 break-all">{server.server.name}</h1>
-            {#if isPrivate}
-              <span class="text-sm bg-purple-100 text-purple-700 px-3 py-1 rounded-full font-medium">
-                Private
-              </span>
-            {:else}
-              <span class="text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-medium">
-                Official
-              </span>
-            {/if}
+            <span class="text-sm {originColor(server.origin)} px-3 py-1 rounded-full font-medium">
+              {formatOrigin(server.origin)}
+            </span>
           </div>
           {#if server.server.title && server.server.title !== server.server.name}
             <p class="text-xl text-gray-600 mb-2">{server.server.title}</p>
@@ -168,6 +180,16 @@
     <section class="bg-gray-50 rounded-lg p-6 mb-8">
       <h2 class="text-lg font-semibold text-gray-900 mb-4">Metadata</h2>
       <dl class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div>
+          <dt class="text-gray-500">Origin</dt>
+          <dd class="font-medium">{formatOrigin(server.origin)}</dd>
+        </div>
+        {#if server.provider_name}
+          <div>
+            <dt class="text-gray-500">Provider</dt>
+            <dd class="font-medium">{server.provider_name}</dd>
+          </div>
+        {/if}
         <div>
           <dt class="text-gray-500">Status</dt>
           <dd class="font-medium capitalize">{meta?.status || 'active'}</dd>

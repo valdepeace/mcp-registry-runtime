@@ -16,6 +16,7 @@ const ConfigSchema = z.object({
     })
     .default('*'),
   REGISTRY_URL: z.string().url().default('http://localhost:3000'),
+  REPOS_DIR: z.string().min(1).default('./data/repos'),
 });
 
 const parseResult = ConfigSchema.safeParse(process.env);
@@ -43,4 +44,5 @@ export const config = {
   jwtSecret: validated.JWT_SECRET,
   corsOrigins: validated.CORS_ORIGINS,
   registryUrl: validated.REGISTRY_URL,
+  reposDir: validated.REPOS_DIR,
 };

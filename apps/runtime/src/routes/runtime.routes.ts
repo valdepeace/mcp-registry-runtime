@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { runtimeService, databaseService, runtimeEventBus, mcpInspectorService, pm2Service } from '../services/index.js';
+import { runtimeService, databaseService, runtimeEventBus, mcpInspectorService, pm2Service, gitService } from '../services/index.js';
 import type { RuntimeEventName } from '../services/index.js';
 import { validateBody, validateQuery } from '../middleware/index.js';
 import {
@@ -9,8 +9,46 @@ import {
 } from '@mcp-nova/types';
 import type { ServerResponse } from '@mcp-nova/types';
 import { config } from '../config/index.js';
+import fs from 'fs';
+import path from 'path';
 
 const router = Router();
+
+interface DetectedCommand {
+  execCmd: string;
+  execArgs: string[];
+}
+
+function detectFromProject(projectDir: string): DetectedCommand | null {
+  const packageJsonPath = path.join(projectDir, 'package.json');
+
+  if (fs.existsSync(packageJsonPath)) {
+    try {
+      const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+      if (pkg.scripts?.start) {
+        return { execCmd: 'npm', execArgs: ['start'] };
+      }
+      if (pkg.main) {
+        return { execCmd: 'node', execArgs: [pkg.main] };
+      }
+    } catch {
+      // invalid package.json
+    }
+  }
+
+  const pyprojectPath = path.join(projectDir, 'pyproject.toml');
+  if (fs.existsSync(pyprojectPath)) {
+    return { execCmd: 'uv', execArgs: ['run', 'server.py'] };
+  }
+
+  const dockerfilePath = path.join(projectDir, 'Dockerfile');
+  if (fs.existsSync(dockerfilePath)) {
+    const imageName = path.basename(projectDir).replace(/[^a-zA-Z0-9._-]/g, '-').toLowerCase();
+    return { execCmd: 'docker', execArgs: ['run', '-i', '--rm', imageName] };
+  }
+
+  return null;
+}
 
 router.get('/events', (req: Request, res: Response) => {
   res.writeHead(200, {
@@ -117,7 +155,12 @@ router.post(
 
 router.post('/instances/from-catalog', async (req: Request, res: Response) => {
   try {
-    const { server_name, version } = req.body as { server_name: string; version?: string };
+    const { server_name, version, clone_repo, auto_start } = req.body as {
+      server_name: string;
+      version?: string;
+      clone_repo?: boolean;
+      auto_start?: boolean;
+    };
 
     if (!server_name) {
       res.status(400).json({ error: 'server_name required' });
@@ -137,54 +180,75 @@ router.post('/instances/from-catalog', async (req: Request, res: Response) => {
 
     const server = await registryResponse.json() as ServerResponse;
 
-    const pkg = server.server.packages?.[0];
-    if (!pkg) {
-      res.status(400).json({ error: 'Server has no packages defined, cannot auto-detect runtime' });
-      return;
+    let cwd: string | undefined;
+
+    if (clone_repo && server.server.repository?.url) {
+      const targetDir = await gitService.cloneRepo(server.server.repository.url, server.server.name);
+      cwd = targetDir;
     }
 
     let exec_cmd: string;
     let exec_args: string[] = [];
+    let env_json: Record<string, string> = {};
 
-    const registryType = pkg.registryType.toLowerCase();
-    const runtimeHint = pkg.runtimeHint?.toLowerCase() || '';
+    const pkg = server.server.packages?.[0];
 
-    if (registryType === 'npm') {
-      exec_cmd = runtimeHint || 'npx';
-      exec_args = [pkg.identifier];
-    } else if (registryType === 'pypi') {
-      exec_cmd = runtimeHint || 'uvx';
-      exec_args = [pkg.identifier];
-    } else if (registryType === 'oci' || registryType === 'docker') {
-      exec_cmd = 'docker';
-      exec_args = ['run', '-i', '--rm', pkg.identifier];
+    if (pkg) {
+      // Auto-detect from package definition (existing logic)
+      const registryType = pkg.registryType.toLowerCase();
+      const runtimeHint = pkg.runtimeHint?.toLowerCase() || '';
+
+      if (registryType === 'npm') {
+        exec_cmd = runtimeHint || 'npx';
+        exec_args = [pkg.identifier];
+      } else if (registryType === 'pypi') {
+        exec_cmd = runtimeHint || 'uvx';
+        exec_args = [pkg.identifier];
+      } else if (registryType === 'oci' || registryType === 'docker') {
+        exec_cmd = 'docker';
+        exec_args = ['run', '-i', '--rm', pkg.identifier];
+      } else {
+        res.status(400).json({
+          error: `Unsupported registry type: ${registryType}. Please create instance manually.`
+        });
+        return;
+      }
+
+      if (pkg.packageArguments) {
+        for (const arg of pkg.packageArguments) {
+          if (arg.type === 'positional' && 'valueHint' in arg && arg.valueHint) {
+            exec_args.push(arg.valueHint);
+          } else if (arg.type === 'named' && 'name' in arg && arg.name) {
+            exec_args.push(arg.name as string);
+          }
+        }
+      }
+
+      if (pkg.environmentVariables) {
+        for (const envVar of pkg.environmentVariables) {
+          if (envVar.default) {
+            env_json[envVar.name] = envVar.default;
+          }
+        }
+      }
+    } else if (clone_repo && cwd) {
+      // No packages — try to auto-detect from cloned project files
+      const detected = detectFromProject(cwd);
+      if (!detected) {
+        res.status(400).json({
+          error: 'Could not auto-detect runtime from cloned project. Create instance manually with the correct exec command.',
+          cwd
+        });
+        return;
+      }
+      exec_cmd = detected.execCmd;
+      exec_args = detected.execArgs;
     } else {
-      res.status(400).json({
-        error: `Unsupported registry type: ${registryType}. Please create instance manually.`
-      });
+      res.status(400).json({ error: 'Server has no packages defined, cannot auto-detect runtime' });
       return;
     }
 
-    if (pkg.packageArguments) {
-      for (const arg of pkg.packageArguments) {
-        if (arg.type === 'positional' && 'valueHint' in arg && arg.valueHint) {
-          exec_args.push(arg.valueHint);
-        } else if (arg.type === 'named' && 'name' in arg) {
-          exec_args.push(arg.name);
-        }
-      }
-    }
-
-    const env_json: Record<string, string> = {};
-    if (pkg.environmentVariables) {
-      for (const envVar of pkg.environmentVariables) {
-        if (envVar.default) {
-          env_json[envVar.name] = envVar.default;
-        }
-      }
-    }
-
-    const input = {
+    const input: Record<string, unknown> = {
       server_name: server.server.name,
       version: server.server.version,
       exec_cmd,
@@ -192,12 +256,36 @@ router.post('/instances/from-catalog', async (req: Request, res: Response) => {
       env_json: Object.keys(env_json).length > 0 ? env_json : undefined,
     };
 
-    const instance = runtimeService.createInstance(input);
+    if (cwd) {
+      input.cwd = cwd;
+    }
+
+    const instance = runtimeService.createInstance(input as any);
+
+    if (auto_start) {
+      try {
+        await runtimeService.startInstance(instance.id);
+      } catch (startErr) {
+        console.error('[Runtime] Auto-start failed:', startErr);
+      }
+      const updated = runtimeService.getInstance(instance.id);
+
+      res.status(201).json({
+        instance: updated,
+        detected: { exec_cmd, exec_args, env_json, cwd },
+        message: cwd
+          ? 'Repo cloned, instance created and started.'
+          : 'Instance created and started.',
+      });
+      return;
+    }
 
     res.status(201).json({
       instance,
-      detected: { exec_cmd, exec_args, env_json },
-      message: 'Instance created from catalog. Review and adjust settings before starting.'
+      detected: { exec_cmd, exec_args, env_json, cwd },
+      message: cwd
+        ? 'Repo cloned, instance created. Review settings before starting.'
+        : 'Instance created from catalog. Review and adjust settings before starting.'
     });
     return;
   } catch (err) {
