@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-nova/registry",
+  "name": "@mcp/registry",
   "version": "1.0.0",
   "description": "MCP Registry Backend API",
   "main": "dist/index.js",
@@ -21,7 +21,7 @@
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.6.2",
-    "@mcp-nova/types": "*",
+    "@mcp/types": "*",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",

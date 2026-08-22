@@ -1,5 +1,5 @@
-import type { AgentListResponse, AgentResponse } from '@mcp-nova/types';
-import { AgentListResponseSchema } from '@mcp-nova/types';
+import type { AgentListResponse, AgentResponse } from '@mcp/types';
+import { AgentListResponseSchema } from '@mcp/types';
 import { config } from '../config/index.js';
 
 export class AgentsRegistryService {

@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-nova/frontend",
+  "name": "@mcp/frontend",
   "version": "1.0.0",
   "private": true,
   "description": "MCP Registry Frontend",
@@ -27,7 +27,7 @@
     "@mastra/ai-sdk": "^1.4.1",
     "@mastra/core": "^1.32.1",
     "@mastra/mcp": "^1.7.0",
-    "@mcp-nova/types": "*",
+    "@mcp/types": "*",
     "@tailwindcss/vite": "^4.1.0",
     "ai": "^6.0.177",
     "tailwindcss": "^4.1.0"

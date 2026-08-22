@@ -1,7 +1,7 @@
 import { Agent } from '@mastra/core/agent';
 import { MCPClient } from '@mastra/mcp';
 import type { MastraMCPServerDefinition } from '@mastra/mcp';
-import type { AgentDetail, SkillResponse, ServerResponse, Package, KeyValueInput } from '@mcp-nova/types';
+import type { AgentDetail, SkillResponse, ServerResponse, Package, KeyValueInput } from '@mcp/types';
 import { config } from '../config/index.js';
 
 export interface ResolvedSkill {

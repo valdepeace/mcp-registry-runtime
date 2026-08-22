@@ -1,6 +1,6 @@
 ---
 name: Task Completion Checklist
-description: What to verify after completing a development task in mcp-nova
+description: What to verify after completing a development task in mcp-registry-runtime
 type: project
 ---
 
@@ -15,9 +15,9 @@ After completing a task:
 
 ## agent-runtime specific checklist
 
-- [ ] `npm run typecheck -w @mcp-nova/agent-runtime`
-- [ ] `npm run build -w @mcp-nova/agent-runtime`
-- [ ] `npm run check -w @mcp-nova/frontend`
+- [ ] `npm run typecheck -w @mcp/agent-runtime`
+- [ ] `npm run build -w @mcp/agent-runtime`
+- [ ] `npm run check -w @mcp/frontend`
 - [ ] `curl http://localhost:3027/health` returns 200
 - [ ] `curl http://localhost:3027/admin/agent-runtime/instances` returns 401 JSON (not HTML/proxy error)
 - [ ] Manual: create instance with `auto_start=false` → verify status=`stopped`

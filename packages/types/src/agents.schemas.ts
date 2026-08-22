@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { NovaMetaSchema, NOVA_META_NAMESPACE } from './schemas.js';
+import { RegistryMetaSchema, REGISTRY_META_NAMESPACE } from './schemas.js';
 import { RepositorySchema } from './schemas.js';
 import { SkillNameSchema } from './skills.schemas.js';
 
-export { NOVA_META_NAMESPACE };
+export { REGISTRY_META_NAMESPACE };
 
 export const AgentCategoryEnum = z.enum([
   'ai',
@@ -56,7 +56,7 @@ export const AgentDetailSchema = z.object({
   websiteUrl: z.string().url().optional(),
   repository: RepositorySchema.optional(),
   _meta: z.object({
-    'com.mcp-nova.meta': NovaMetaSchema.optional(),
+    'com.mcp-registry-runtime.meta': RegistryMetaSchema.optional(),
   }).catchall(z.unknown()).optional(),
 });
 

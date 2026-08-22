@@ -6,8 +6,8 @@ import {
   CreateRuntimeInstanceSchema,
   UpdateRuntimeInstanceSchema,
   LogsQuerySchema
-} from '@mcp-nova/types';
-import type { ServerResponse } from '@mcp-nova/types';
+} from '@mcp/types';
+import type { ServerResponse } from '@mcp/types';
 import { config } from '../config/index.js';
 import fs from 'fs';
 import path from 'path';

@@ -45,5 +45,5 @@ All re-exported from `index.ts`
 
 ## Types
 
-- `src/lib/types.ts` — local types (in progress: migrate to `@mcp-nova/types`)
+- `src/lib/types.ts` — local types (in progress: migrate to `@mcp/types`)
 - Agent-runtime types should come from `packages/types/src/agent-runtime.ts` (pending cleanup)

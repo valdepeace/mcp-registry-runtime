@@ -7,7 +7,7 @@
  * Since Smithery provides less detail than the official MCP registry (no packages,
  * transport types, etc.), we map what's available and mark source accordingly.
  */
-import type { ServerResponse } from '@mcp-nova/types';
+import type { ServerResponse } from '@mcp/types';
 import type { ServersProvider } from './types.js';
 import { config } from '../../config/index.js';
 
@@ -98,7 +98,7 @@ export class SmitheryServersProvider implements ServersProvider {
       },
       source: 'registry',
       _meta: {
-        'com.mcp-nova.meta': {
+        'com.mcp-registry-runtime.meta': {
           verified: s.verified,
           featured: false,
           vendorOfficial: false,

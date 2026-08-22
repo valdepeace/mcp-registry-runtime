@@ -1,7 +1,7 @@
 import pm2SDK from 'pm2';
 import { readFileSync, existsSync } from 'fs';
 import type { ProcessDescription } from 'pm2';
-import type { RuntimeStatus, PM2ProcessInfo } from '@mcp-nova/types';
+import type { RuntimeStatus, PM2ProcessInfo } from '@mcp/types';
 
 export class PM2Service {
   private connected = false;

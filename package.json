@@ -1,5 +1,5 @@
 {
-  "name": "mcp-nova",
+  "name": "mcp-registry-runtime",
   "version": "1.0.0",
   "private": true,
   "description": "Private MCP Server Registry - Monorepo",

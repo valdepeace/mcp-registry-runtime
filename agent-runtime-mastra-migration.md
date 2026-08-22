@@ -161,7 +161,7 @@ That means each agent instance is a live Mastra `Agent` cached inside the `agent
 ### Phase 6 - Types
 
 - [ ] Remove duplicated agent-runtime types from `apps/frontend/src/lib/types.ts`.
-- [ ] Re-export/import agent-runtime types from `@mcp-nova/types`.
+- [ ] Re-export/import agent-runtime types from `@mcp/types`.
 - [ ] Align nullable fields with the backend wire contract.
 - [ ] Keep parsed display helpers local to components, not in the API contract.
 
@@ -187,9 +187,9 @@ That means each agent instance is a live Mastra `Agent` cached inside the `agent
 
 ## Verification Checklist
 
-- [x] `npm run typecheck -w @mcp-nova/agent-runtime`
-- [x] `npm run build -w @mcp-nova/agent-runtime`
-- [x] `npm run check -w @mcp-nova/frontend`
+- [x] `npm run typecheck -w @mcp/agent-runtime`
+- [x] `npm run build -w @mcp/agent-runtime`
+- [x] `npm run check -w @mcp/frontend`
 - [x] Manual smoke: `agent-runtime` foreground/background process returns `/health`.
 - [x] Manual smoke: `/admin/agent-runtime/instances` returns `401` JSON without token instead of HTML/proxy failure while backend is alive.
 - [x] Manual smoke: frontend proxy forwards `/admin/agent-runtime/instances` to `3027` while using the repo frontend.

@@ -1,4 +1,4 @@
-import type { AgentDetail, AgentResponse } from '@mcp-nova/types';
+import type { AgentDetail, AgentResponse } from '@mcp/types';
 import { config } from '../config/index.js';
 import type { ResolvedSkill, ResolvedMCPServer, AgentSnapshot } from '../mastra/agent-factory.js';
 import { createMastraAgent, resolveAgentSnapshot, type MastraAgentResult } from '../mastra/agent-factory.js';

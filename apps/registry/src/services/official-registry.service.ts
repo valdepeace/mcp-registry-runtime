@@ -1,5 +1,5 @@
-import type { ServerListResponse, ServerResponse, ListServersParams } from '@mcp-nova/types';
-import { ServerListResponseSchema } from '@mcp-nova/types';
+import type { ServerListResponse, ServerResponse, ListServersParams } from '@mcp/types';
+import { ServerListResponseSchema } from '@mcp/types';
 import { config } from '../config/index.js';
 import { SmitheryServersProvider, type ServersProvider } from './providers/index.js';
 

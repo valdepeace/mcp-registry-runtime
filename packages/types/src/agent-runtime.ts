@@ -91,7 +91,7 @@ export interface ResolvedMCPServer {
 
 /**
  * ComposedAgent is the shape returned by POST /admin/agent-runtime/compose.
- * Re-exported from agent-composer.service.ts (was not previously in @mcp-nova/types).
+ * Re-exported from agent-composer.service.ts (was not previously in @mcp/types).
  */
 export interface ComposedAgent {
   agent: AgentDetail;

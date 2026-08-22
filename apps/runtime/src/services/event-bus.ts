@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import type { RuntimeInstance, RuntimeStatus } from '@mcp-nova/types';
+import type { RuntimeInstance, RuntimeStatus } from '@mcp/types';
 
 export interface RuntimeMetricEntry {
   id: string;

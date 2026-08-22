@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { NOVA_META_NAMESPACE } from './mcp-registry.js';
+import { REGISTRY_META_NAMESPACE } from './mcp-registry.js';
 
-export { NOVA_META_NAMESPACE };
+export { REGISTRY_META_NAMESPACE };
 
 export const ServerCategoryEnum = z.enum([
   'ai',
@@ -14,7 +14,7 @@ export const ServerCategoryEnum = z.enum([
   'other',
 ]);
 
-export const NovaMetaSchema = z.object({
+export const RegistryMetaSchema = z.object({
   tags: z.array(z.string().min(1).max(50)).max(10).optional(),
   category: ServerCategoryEnum.optional(),
   verified: z.boolean().optional(),
@@ -23,7 +23,7 @@ export const NovaMetaSchema = z.object({
   vendorOfficial: z.boolean().optional(),
 });
 
-export type NovaMetaSchemaType = z.infer<typeof NovaMetaSchema>;
+export type RegistryMetaSchemaType = z.infer<typeof RegistryMetaSchema>;
 export type ServerCategorySchemaType = z.infer<typeof ServerCategoryEnum>;
 
 // Transport schemas
@@ -162,7 +162,7 @@ export const ServerDetailSchema = z.object({
   remotes: z.array(RemoteTransportSchema).optional(),
   _meta: z.object({
     'io.modelcontextprotocol.registry/publisher-provided': z.record(z.unknown()).optional(),
-    'com.mcp-nova.meta': NovaMetaSchema.optional(),
+    'com.mcp-registry-runtime.meta': RegistryMetaSchema.optional(),
   }).catchall(z.unknown()).optional(),
 });
 

@@ -3,7 +3,7 @@
  * Agents are composable workers: Instructions + Skills + MCP Servers (tools).
  */
 
-import type { NovaMeta, Repository } from './mcp-registry.js';
+import type { RegistryMeta, Repository } from './mcp-registry.js';
 
 export type AgentSource = 'registry' | 'private';
 
@@ -56,7 +56,7 @@ export interface AgentDetail {
   websiteUrl?: string;
   repository?: Repository;
   _meta?: {
-    'com.mcp-nova.meta'?: NovaMeta;
+    'com.mcp-registry-runtime.meta'?: RegistryMeta;
     [key: string]: unknown;
   };
 }

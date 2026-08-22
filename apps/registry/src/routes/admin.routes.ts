@@ -3,10 +3,10 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { databaseService, syncService } from '../services/index.js';
 import { authMiddleware, requireAdmin, validateBody, AuthenticatedRequest } from '../middleware/index.js';
-import { CreateServerSchema, UpdateServerSchema, CreateSkillSchema, UpdateSkillSchema, CreateAgentSchema, UpdateAgentSchema } from '@mcp-nova/types';
+import { CreateServerSchema, UpdateServerSchema, CreateSkillSchema, UpdateSkillSchema, CreateAgentSchema, UpdateAgentSchema } from '@mcp/types';
 import { config } from '../config/index.js';
 import { z } from 'zod';
-import type { Package, RemoteTransport } from '@mcp-nova/types';
+import type { Package, RemoteTransport } from '@mcp/types';
 import { syncEventBus } from '../services/sync-event-bus.js';
 
 const router = Router();

@@ -30,7 +30,7 @@ Mastra **in-process** per agent-runtime process — no PM2 per agent. Live agent
 - **Frontend Phase 3**: Action gating by state (Start only stopped/errored, Stop only online/starting, Invoke only online)
 - **Frontend Phase 4**: Compose preview UI (dry-run, resolved skills, available tools, tool_access filter result)
 - **Frontend Phase 5**: Streaming chat error contract, consistent invoke/chat behavior
-- **Frontend Phase 6**: Remove duplicate types from types.ts → use @mcp-nova/types
+- **Frontend Phase 6**: Remove duplicate types from types.ts → use @mcp/types
 - **Frontend Phase 7**: Invocation history view per instance
 
 ## New files added (not yet committed)

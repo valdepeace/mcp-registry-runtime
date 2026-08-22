@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-nova/runtime",
+  "name": "@mcp/runtime",
   "version": "1.0.0",
   "description": "MCP Runtime Backend — process management & MCP inspector",
   "main": "dist/index.js",
@@ -20,7 +20,7 @@
   "type": "module",
   "dependencies": {
     "better-sqlite3": "^12.6.2",
-    "@mcp-nova/types": "*",
+    "@mcp/types": "*",
     "cors": "^2.8.6",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",

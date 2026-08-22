@@ -155,7 +155,7 @@ export interface ListServersParams {
 // Extended types for private registry
 export type ServerSource = 'registry' | 'private' | 'azure-devops';
 
-// Nova custom metadata namespace
+// Custom metadata namespace
 export type ServerCategory = 
   | 'ai'
   | 'data'
@@ -166,7 +166,7 @@ export type ServerCategory =
   | 'productivity'
   | 'other';
 
-export interface NovaMeta {
+export interface RegistryMeta {
   tags?: string[];
   category?: ServerCategory;
   verified?: boolean;
@@ -175,7 +175,7 @@ export interface NovaMeta {
   vendorOfficial?: boolean;
 }
 
-export const NOVA_META_NAMESPACE = 'com.mcp-nova.meta' as const;
+export const REGISTRY_META_NAMESPACE = 'com.mcp-registry-runtime.meta' as const;
 
 export interface PrivateServerDetail extends ServerDetail {
   source: ServerSource;
@@ -184,7 +184,7 @@ export interface PrivateServerDetail extends ServerDetail {
   createdBy?: string;
   _meta?: {
     'io.modelcontextprotocol.registry/publisher-provided'?: Record<string, unknown>;
-    'com.mcp-nova.meta'?: NovaMeta;
+    'com.mcp-registry-runtime.meta'?: RegistryMeta;
     [key: string]: unknown;
   };
 }

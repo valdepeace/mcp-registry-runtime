@@ -390,6 +390,7 @@ class ApiClient {
     if (params.featured != null) searchParams.set('featured', String(params.featured));
     if (params.format) searchParams.set('format', params.format);
     if (params.source) searchParams.set('source', params.source);
+    if (params.provider_name) searchParams.set('provider_name', params.provider_name);
     const query = searchParams.toString();
     return this.request<SkillListResponse>(`/v0.1/skills${query ? `?${query}` : ''}`);
   }

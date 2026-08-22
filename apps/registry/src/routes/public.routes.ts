@@ -6,8 +6,8 @@ import {
   ListSkillsQuerySchema,
   ListAgentsQuerySchema,
   type ServerCategory,
-} from '@mcp-nova/types';
-import type { SkillCategory, AgentCategory, SkillFormat, AgentType } from '@mcp-nova/types';
+} from '@mcp/types';
+import type { SkillCategory, AgentCategory, SkillFormat, AgentType } from '@mcp/types';
 
 const router = Router();
 
@@ -147,6 +147,7 @@ router.get(
       featured?: boolean;
       format?: SkillFormat;
       source?: 'registry' | 'private' | 'all';
+      provider_name?: string;
     };
 
     const offset = query.cursor ? parseInt(query.cursor, 10) : 0;
@@ -155,6 +156,7 @@ router.get(
     const result = databaseService.querySkills({
       search: query.search,
       source: query.source,
+      provider_name: query.provider_name,
       category: query.category,
       tags: query.tags,
       verified: query.verified,

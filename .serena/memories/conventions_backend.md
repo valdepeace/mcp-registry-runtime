@@ -18,7 +18,7 @@ type: project
 
 - **Official servers immutable**: cannot update/delete `source='official'` rows
 - **Server names contain `/`** — use `encodeURIComponent` in URL paths
-- **Custom metadata**: `com.mcp-nova.meta` key inside `_meta` (verified, featured, tags, category, license)
+- **Custom metadata**: `com.mcp-registry-runtime.meta` key inside `_meta` (verified, featured, tags, category, license)
 - Providers: `smithery-servers.provider.ts`, `smithery-skills.provider.ts`, `skills-sh.provider.ts`
 - Sync event bus: `sync-event-bus.ts` for SSE streaming of sync progress
 

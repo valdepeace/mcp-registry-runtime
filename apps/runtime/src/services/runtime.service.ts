@@ -1,7 +1,7 @@
 import Database from 'better-sqlite3';
 import { randomUUID } from 'crypto';
-import type { RuntimeInstance, StoredRuntimeInstance, RuntimeStatus } from '@mcp-nova/types';
-import type { CreateRuntimeInstanceInput, UpdateRuntimeInstanceInput } from '@mcp-nova/types';
+import type { RuntimeInstance, StoredRuntimeInstance, RuntimeStatus } from '@mcp/types';
+import type { CreateRuntimeInstanceInput, UpdateRuntimeInstanceInput } from '@mcp/types';
 import { pm2Service, PM2Service } from './pm2.service.js';
 import { runtimeEventBus } from './event-bus.js';
 

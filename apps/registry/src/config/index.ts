@@ -11,6 +11,7 @@ const ConfigSchema = z.object({
   OFFICIAL_AGENTS_REGISTRY_URL: z.string().url().optional(),
   SKILLS_SH_API_URL: z.string().url().optional(),
   SKILLS_SH_API_KEY: z.string().optional(),
+  GITHUB_TOKEN: z.string().optional(),
   SMITHERY_API_URL: z.string().url().optional(),
   SMITHERY_SKILLS_MAX: z.coerce.number().int().min(0).optional(),
   SYNC_INTERVAL_MS: z.coerce.number().int().min(0).default(300_000),
@@ -42,6 +43,10 @@ if (!parseResult.success) {
   }
 }
 
+if (process.env.NODE_ENV === 'production' && process.env.JWT_SECRET === 'change-me-in-production') {
+  throw new Error('JWT_SECRET must be changed in production. Set it in your .env file.');
+}
+
 // Use validated values, or fall back to all-defaults when validation failed (production)
 const validated = parseResult.success
   ? parseResult.data
@@ -55,6 +60,7 @@ export const config = {
   officialAgentsRegistryUrl: validated.OFFICIAL_AGENTS_REGISTRY_URL,
   skillsShApiUrl: validated.SKILLS_SH_API_URL,
   skillsShApiKey: validated.SKILLS_SH_API_KEY,
+  githubToken: validated.GITHUB_TOKEN,
   smitheryApiUrl: validated.SMITHERY_API_URL,
   smitherySkillsMax: validated.SMITHERY_SKILLS_MAX,
   syncIntervalMs: validated.SYNC_INTERVAL_MS,

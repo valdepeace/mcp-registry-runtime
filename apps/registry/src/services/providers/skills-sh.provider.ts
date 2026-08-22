@@ -10,7 +10,7 @@
  *   3. Parse SKILL.md frontmatter (YAML delimited by ---) + markdown body
  *   4. Map to SkillResponse format
  */
-import type { SkillResponse, SkillCategory } from '@mcp-nova/types';
+import type { SkillResponse, SkillCategory } from '@mcp/types';
 import type { SkillsProvider } from './types.js';
 import { config } from '../../config/index.js';
 
@@ -88,9 +88,7 @@ export class SkillsShProvider implements SkillsProvider {
   }
 
   isConfigured(): boolean {
-    if (this.baseUrl.length === 0) return false;
-    if (!this.apiKey) return false;
-    return true;
+    return this.baseUrl.length > 0;
   }
 
   async fetchAllSkills(onProgress?: (msg: string, current?: number, total?: number) => void): Promise<SkillResponse[]> {
@@ -177,7 +175,7 @@ export class SkillsShProvider implements SkillsProvider {
           },
           source: 'registry',
           _meta: {
-            'com.mcp-nova.meta': {
+            'com.mcp-registry-runtime.meta': {
               vendorOfficial: false,
             },
           },
@@ -202,7 +200,7 @@ export class SkillsShProvider implements SkillsProvider {
         },
         source: 'registry',
         _meta: {
-          'com.mcp-nova.meta': {
+          'com.mcp-registry-runtime.meta': {
             vendorOfficial: false,
           },
         },

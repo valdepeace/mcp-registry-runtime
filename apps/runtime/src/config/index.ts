@@ -33,6 +33,10 @@ if (!parseResult.success) {
   }
 }
 
+if (process.env.NODE_ENV === 'production' && process.env.JWT_SECRET === 'change-me-in-production') {
+  throw new Error('JWT_SECRET must be changed in production. Set it in your .env file.');
+}
+
 const validated = parseResult.success
   ? parseResult.data
   : ConfigSchema.parse({});

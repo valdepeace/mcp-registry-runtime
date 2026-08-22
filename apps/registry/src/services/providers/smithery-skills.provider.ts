@@ -9,7 +9,7 @@
  *   2. Compute the raw.githubusercontent.com URL for each skill's SKILL.md
  *   3. Store metadata + rawUrl in _meta.smithery — frontend fetches content on demand
  */
-import type { SkillResponse } from '@mcp-nova/types';
+import type { SkillResponse } from '@mcp/types';
 import type { SkillsProvider } from './types.js';
 import { config } from '../../config/index.js';
 
@@ -62,7 +62,7 @@ function mapSkill(sk: SmitherySkill): SkillResponse {
     },
     source: 'registry',
     _meta: {
-      'com.mcp-nova.meta': {
+      'com.mcp-registry-runtime.meta': {
         verified: sk.verified,
         featured: sk.featured,
         vendorOfficial: false,

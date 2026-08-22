@@ -1,8 +1,8 @@
 import { z } from 'zod';
-import { NovaMetaSchema, NOVA_META_NAMESPACE } from './schemas.js';
+import { RegistryMetaSchema, REGISTRY_META_NAMESPACE } from './schemas.js';
 import { RepositorySchema } from './schemas.js';
 
-export { NOVA_META_NAMESPACE };
+export { REGISTRY_META_NAMESPACE };
 
 export const SkillFormatEnum = z.enum(['markdown', 'json', 'yaml']);
 
@@ -37,7 +37,7 @@ export const SkillDetailSchema = z.object({
   websiteUrl: z.string().url().optional(),
   repository: RepositorySchema.optional(),
   _meta: z.object({
-    'com.mcp-nova.meta': NovaMetaSchema.optional(),
+    'com.mcp-registry-runtime.meta': RegistryMetaSchema.optional(),
   }).catchall(z.unknown()).optional(),
 });
 
@@ -59,6 +59,7 @@ export const ListSkillsQuerySchema = z.object({
   featured: z.coerce.boolean().optional(),
   format: SkillFormatEnum.optional(),
   source: z.enum(['registry', 'private', 'all']).optional().default('all'),
+  provider_name: z.string().optional(),
 });
 
 export type CreateSkillInput = z.infer<typeof CreateSkillSchema>;

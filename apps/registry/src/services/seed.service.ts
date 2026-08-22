@@ -1,5 +1,5 @@
-import type { AgentResponse } from '@mcp-nova/types';
-import { NOVA_META_NAMESPACE } from '@mcp-nova/types';
+import type { AgentResponse } from '@mcp/types';
+import { REGISTRY_META_NAMESPACE } from '@mcp/types';
 import { databaseService } from './database.service.js';
 
 const BUILT_IN_AGENTS: AgentResponse[] = [
@@ -51,7 +51,7 @@ When generating code: provide complete, runnable files. Include import statement
       tags: ['typescript', 'nodejs', 'api', 'database', 'express'],
     },
     _meta: {
-      [NOVA_META_NAMESPACE]: {
+      [REGISTRY_META_NAMESPACE]: {
         verified: true,
         featured: true,
         category: 'backend',
@@ -109,7 +109,7 @@ Generate complete component files with full TypeScript types. Include CSS/Tailwi
       tags: ['typescript', 'react', 'svelte', 'css', 'ui'],
     },
     _meta: {
-      [NOVA_META_NAMESPACE]: {
+      [REGISTRY_META_NAMESPACE]: {
         verified: true,
         featured: true,
         category: 'frontend',
@@ -174,7 +174,7 @@ Provide complete configuration files (Dockerfile, YAML manifests, Terraform modu
       tags: ['docker', 'kubernetes', 'cicd', 'terraform', 'cloud'],
     },
     _meta: {
-      [NOVA_META_NAMESPACE]: {
+      [REGISTRY_META_NAMESPACE]: {
         verified: true,
         featured: true,
         category: 'devops',
@@ -226,7 +226,7 @@ Structure findings as: high-level summary, component map, key data flows, notabl
       tags: ['analysis', 'architecture', 'documentation', 'search'],
     },
     _meta: {
-      [NOVA_META_NAMESPACE]: {
+      [REGISTRY_META_NAMESPACE]: {
         verified: true,
         featured: true,
         category: 'development',
@@ -280,7 +280,7 @@ Match the format to the task: prose for explanations, bullet lists for enumerati
       tags: ['research', 'analysis', 'writing', 'general'],
     },
     _meta: {
-      [NOVA_META_NAMESPACE]: {
+      [REGISTRY_META_NAMESPACE]: {
         verified: true,
         featured: true,
         category: 'other',
@@ -338,7 +338,7 @@ Provide complete test files with all imports and setup. Group tests logically us
       tags: ['testing', 'api', 'integration', 'jest', 'supertest'],
     },
     _meta: {
-      [NOVA_META_NAMESPACE]: {
+      [REGISTRY_META_NAMESPACE]: {
         verified: true,
         featured: true,
         category: 'qa',
@@ -397,7 +397,7 @@ Provide complete test files with fixture setup, helper utilities, and page objec
       tags: ['testing', 'playwright', 'cypress', 'e2e', 'a11y'],
     },
     _meta: {
-      [NOVA_META_NAMESPACE]: {
+      [REGISTRY_META_NAMESPACE]: {
         verified: true,
         featured: true,
         category: 'qa',

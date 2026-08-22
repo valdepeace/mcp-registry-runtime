@@ -1,0 +1,47 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "small_model": "opencode-go/deepseek-v4-flash-free",
+  "provider": {
+    "opencode-go": {
+      "models": {
+        "deepseek-v4-pro": {
+          "name": "DeepSeek V4 Pro"
+        },
+        "deepseek-v4-flash": {
+          "name": "DeepSeek V4 Flash"
+        },
+        "deepseek-v4-flash-free": {
+          "name": "DeepSeek V4 Flash Free"
+        },
+        "qwen3.7-max": {
+          "name": "Qwen 3.7 Max"
+        },
+        "qwen3.7-plus": {
+          "name": "Qwen 3.7 Plus"
+        },
+        "qwen3.6-plus": {
+          "name": "Qwen 3.6 Plus"
+        },
+        "kimi-k2.6": {
+          "name": "Kimi K2.6"
+        },
+        "kimi-k2.5": {
+          "name": "Kimi K2.5"
+        },
+        "glm-5.1": {
+          "name": "GLM 5.1"
+        },
+        "minimax-m2.7": {
+          "name": "MiniMax M2.7"
+        },
+        "mimo-v2.5-free": {
+          "name": "MiMo V2.5 Free"
+        }
+      }
+    }
+  },
+  "compaction": {
+    "auto": true,
+    "tail_turns": 15
+  }
+}

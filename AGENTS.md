@@ -16,10 +16,10 @@ npm run build                # All workspaces
 npm run typecheck            # All workspaces
 
 # Workspace-scoped
-npm run build -w @mcp-nova/registry
-npm run build -w @mcp-nova/runtime
-npm run build -w @mcp-nova/agent-runtime
-npm run build -w @mcp-nova/frontend
+npm run build -w @mcp/registry
+npm run build -w @mcp/runtime
+npm run build -w @mcp/agent-runtime
+npm run build -w @mcp/frontend
 cd apps/registry && npm run typecheck
 cd apps/runtime && npm run typecheck
 cd apps/agent-runtime && npm run typecheck
@@ -34,11 +34,11 @@ No test framework is configured.
 ## Architecture
 
 ```
-apps/registry/       @mcp-nova/registry       Express 5 + TypeScript ESM + SQLite (servers, users, sync)
-apps/runtime/        @mcp-nova/runtime        Express 5 + TypeScript ESM + SQLite (instances, inspect) + PM2
-apps/agent-runtime/  @mcp-nova/agent-runtime  Express 5 + TypeScript ESM + SQLite (agent_instances, invocations) + PM2
-apps/frontend/       @mcp-nova/frontend       SvelteKit 5 + Tailwind v4 (static adapter, SPA fallback)
-packages/types/      @mcp-nova/types          Shared TypeScript types + Zod schemas
+apps/registry/       @mcp/registry       Express 5 + TypeScript ESM + SQLite (servers, users, sync)
+apps/runtime/        @mcp/runtime        Express 5 + TypeScript ESM + SQLite (instances, inspect) + PM2
+apps/agent-runtime/  @mcp/agent-runtime  Express 5 + TypeScript ESM + SQLite (agent_instances, invocations) + PM2
+apps/frontend/       @mcp/frontend       SvelteKit 5 + Tailwind v4 (static adapter, SPA fallback)
+packages/types/      @mcp/types          Shared TypeScript types + Zod schemas
 ```
 
 ### Registry — entry: `apps/registry/src/index.ts` (port 3000)
@@ -81,7 +81,7 @@ packages/types/      @mcp-nova/types          Shared TypeScript types + Zod sche
 - **Express 5 readonly params/query** — validated values on `(req as any).validatedQuery` / `(req as any).validatedParams`
 - **SSE JWT via query param** — `EventSource` can't set headers, so `/admin/runtime/events` accepts `?token=...`
 - **PM2 state is eagerly synced** — `GET /admin/runtime/instances` calls `pm2 jlist` and updates DB before responding
-- **Custom metadata namespace** — `com.mcp-nova.meta` in `_meta` for verified/featured/tags/category/license
+- **Custom metadata namespace** — `com.mcp-registry-runtime.meta` in `_meta` for verified/featured/tags/category/license
 - **Always `return` after `res.json()`/`res.send()`** to avoid double-header errors
 - **Runtime health check** — HTTP 406 (MCP streamable) is treated as healthy
 - **Inspect history capped at 100** per instance, older entries auto-deleted

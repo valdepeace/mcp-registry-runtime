@@ -1,4 +1,4 @@
-import type { ServerResponse, SkillResponse, AgentResponse } from '@mcp-nova/types';
+import type { ServerResponse, SkillResponse, AgentResponse } from '@mcp/types';
 
 export type ProgressCallback = (message: string, current?: number, total?: number) => void;
 

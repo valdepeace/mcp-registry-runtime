@@ -24,8 +24,8 @@ npm run build                # Build all workspaces
 npm run typecheck            # Type check all workspaces
 
 # Workspace-specific
-npm run build -w @mcp-nova/backend
-npm run build -w @mcp-nova/frontend
+npm run build -w @mcp/backend
+npm run build -w @mcp/frontend
 
 # Frontend-specific checks
 cd apps/frontend && npm run check    # svelte-check + TypeScript
@@ -80,7 +80,7 @@ Services are exported as singletons (class instance, not class). Database is SQL
 - **Express 5 read-only query/params**: validated values land in `req.validatedQuery` / `req.validatedParams`, not `req.query` / `req.params` (Express 5 made those read-only)
 - **SSE endpoints accept JWT via `?token=` query param** - `EventSource` cannot set custom headers, so runtime event streams pass the token in the URL
 - **PM2 state is eagerly synced**: `GET /admin/runtime/instances` runs `pm2 jlist` and updates the DB before responding
-- **Custom metadata namespace**: `com.mcp-nova.meta` key inside server `_meta` carries verified, featured, tags, category, license without conflicting with the official registry spec
+- **Custom metadata namespace**: `com.mcp-registry-runtime.meta` key inside server `_meta` carries verified, featured, tags, category, license without conflicting with the official registry spec
 
 ### Frontend
 

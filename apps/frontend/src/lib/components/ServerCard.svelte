@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { ServerResponse, NovaMeta, PrivateMeta } from '$lib/types';
-  import { NOVA_META_NAMESPACE } from '$lib/types';
+  import type { ServerResponse, RegistryMeta, PrivateMeta } from '$lib/types';
+  import { REGISTRY_META_NAMESPACE } from '$lib/types';
   import { api } from '$lib/api/client';
   import Chip from './Chip.svelte';
   import LaunchModal from './LaunchModal.svelte';
@@ -18,9 +18,9 @@
 
   const meta = $derived(server._meta?.['io.modelcontextprotocol.registry/official']);
   const privateMeta = $derived(server._meta?.['io.modelcontextprotocol.registry/private'] as PrivateMeta | undefined);
-  const novaMeta = $derived(server._meta?.[NOVA_META_NAMESPACE] as NovaMeta | undefined);
+  const registryMeta = $derived(server._meta?.[REGISTRY_META_NAMESPACE] as RegistryMeta | undefined);
   const isOfficial = $derived(server.source === 'registry');
-  const isVendorOfficial = $derived(novaMeta?.vendorOfficial === true);
+  const isVendorOfficial = $derived(registryMeta?.vendorOfficial === true);
   const isPrivate = $derived(server.source === 'private');
   const isAzureDevops = $derived(server.source === 'azure-devops');
 
@@ -140,10 +140,10 @@
         {server.server.name}
       </h3>
       <div class="flex items-center gap-2">
-        {#if novaMeta?.verified}
+        {#if registryMeta?.verified}
           <Chip variant="success" icon="✓">Verified</Chip>
         {/if}
-        {#if novaMeta?.featured}
+        {#if registryMeta?.featured}
           <Chip variant="warning" icon="★">Featured</Chip>
         {/if}
         <span class="text-xs text-gray-500 font-medium whitespace-nowrap">
@@ -191,14 +191,14 @@
       {#each registryTypes as registry}
         <Chip variant="info">{registry}</Chip>
       {/each}
-      {#if novaMeta?.category}
-        <Chip variant="primary">{novaMeta.category}</Chip>
+      {#if registryMeta?.category}
+        <Chip variant="primary">{registryMeta.category}</Chip>
       {/if}
-      {#each novaMeta?.tags ?? [] as tag}
+      {#each registryMeta?.tags ?? [] as tag}
         <Chip variant="default">{tag}</Chip>
       {/each}
-      {#if novaMeta?.license}
-        <Chip variant="default">{novaMeta.license}</Chip>
+      {#if registryMeta?.license}
+        <Chip variant="default">{registryMeta.license}</Chip>
       {/if}
     </div>
 

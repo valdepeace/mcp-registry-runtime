@@ -1,7 +1,7 @@
 /**
  * MCP Registry Types
  *
- * Core types re-exported from the shared @mcp-nova/types package.
+ * Core types re-exported from the shared @mcp/types package.
  * Frontend-specific types and UI constants are defined locally.
  */
 
@@ -22,9 +22,9 @@ import type {
   AgentSource,
   AgentCategory,
   AgentType,
-} from '@mcp-nova/types';
+} from '@mcp/types';
 
-import { NOVA_META_NAMESPACE } from '@mcp-nova/types';
+import { REGISTRY_META_NAMESPACE } from '@mcp/types';
 
 // ── Re-exports from shared types package ────────────────────────────────────
 
@@ -32,7 +32,7 @@ export type {
   TransportType,
   ServerSource,
   ServerCategory,
-  NovaMeta,
+  RegistryMeta,
   StdioTransport,
   StreamableHttpTransport,
   SseTransport,
@@ -60,9 +60,9 @@ export type {
   AgentSource,
   AgentCategory,
   AgentType,
-} from '@mcp-nova/types';
+} from '@mcp/types';
 
-export { NOVA_META_NAMESPACE } from '@mcp-nova/types';
+export { REGISTRY_META_NAMESPACE } from '@mcp/types';
 
 // ── Frontend-specific constants ─────────────────────────────────────────────
 
@@ -354,6 +354,7 @@ export interface SkillListParams {
   featured?: boolean;
   format?: SkillFormat;
   source?: SkillSource | 'all';
+  provider_name?: string;
 }
 
 export interface AgentListParams {

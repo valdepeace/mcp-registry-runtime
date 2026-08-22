@@ -1,21 +1,21 @@
 ---
 name: Project Overview
-description: High-level description of the mcp-nova project — 4-app monorepo with registry, runtime, agent-runtime, and frontend
+description: High-level description of the mcp-registry-runtime project — 4-app monorepo with registry, runtime, agent-runtime, and frontend
 type: project
 ---
 
-Private MCP (Model Context Protocol) server registry monorepo. Project name: **mcp-nova**.
+Private MCP (Model Context Protocol) server registry monorepo. Project name: **mcp-registry-runtime**.
 
 **Purpose**: Syncs with the official MCP registry, supports private server catalog, manages MCP server processes via PM2, and runs AI agents using Mastra in-process.
 
 **4 apps + 1 shared package**:
 | Workspace | Package | Port | Purpose |
 |-----------|---------|------|---------|
-| `apps/registry` | `@mcp-nova/registry` | 3000 | MCP server catalog — official sync + private servers + skills |
-| `apps/runtime` | `@mcp-nova/runtime` | 3001 | PM2-managed MCP server process lifecycle |
-| `apps/agent-runtime` | `@mcp-nova/agent-runtime` | 3027 | Mastra in-process AI agents — create, start, stop, invoke, stream |
-| `apps/frontend` | `@mcp-nova/frontend` | 5173 | SvelteKit 5 admin dashboard |
-| `packages/types` | `@mcp-nova/types` | — | Shared Zod schemas + TypeScript types |
+| `apps/registry` | `@mcp/registry` | 3000 | MCP server catalog — official sync + private servers + skills |
+| `apps/runtime` | `@mcp/runtime` | 3001 | PM2-managed MCP server process lifecycle |
+| `apps/agent-runtime` | `@mcp/agent-runtime` | 3027 | Mastra in-process AI agents — create, start, stop, invoke, stream |
+| `apps/frontend` | `@mcp/frontend` | 5173 | SvelteKit 5 admin dashboard |
+| `packages/types` | `@mcp/types` | — | Shared Zod schemas + TypeScript types |
 
 **Key architectural decisions**:
 - `agent-runtime` uses Mastra **in-process** — no PM2 per agent, agents cached in `AgentInvokerService.agentCache`

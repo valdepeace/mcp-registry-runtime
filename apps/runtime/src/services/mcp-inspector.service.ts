@@ -1,6 +1,6 @@
 import { spawn } from 'child_process';
 import { createInterface } from 'readline';
-import type { RuntimeInstance } from '@mcp-nova/types';
+import type { RuntimeInstance } from '@mcp/types';
 
 export interface McpTool {
   name: string;
@@ -185,7 +185,7 @@ class McpInspectorService {
     const { sessionId } = await this.fetchRpc(endpoint, 'initialize', {
       protocolVersion: '2024-11-05',
       capabilities: {},
-      clientInfo: { name: 'mcp-nova-inspector', version: '1.0.0' },
+      clientInfo: { name: 'mcp-registry-runtime-inspector', version: '1.0.0' },
     }, null);
 
     try {
@@ -290,7 +290,7 @@ class McpInspectorService {
     await rpc('initialize', {
       protocolVersion: '2024-11-05',
       capabilities: {},
-      clientInfo: { name: 'mcp-nova-inspector', version: '1.0.0' },
+      clientInfo: { name: 'mcp-registry-runtime-inspector', version: '1.0.0' },
     });
     notify('notifications/initialized');
 

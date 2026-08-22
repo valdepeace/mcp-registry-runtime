@@ -1,1 +1,1 @@
-export * from '@mcp-nova/types';
+export * from '@mcp/types';

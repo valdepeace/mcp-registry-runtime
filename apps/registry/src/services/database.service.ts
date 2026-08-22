@@ -5,15 +5,15 @@ import type {
   ServerDetail,
   ServerResponse,
   ServerSource,
-  NovaMeta,
+  RegistryMeta,
   SkillDetail,
   SkillResponse,
   SkillSource,
   AgentDetail,
   AgentResponse,
   AgentSource,
-} from '@mcp-nova/types';
-import { NOVA_META_NAMESPACE } from '@mcp-nova/types';
+} from '@mcp/types';
+import { REGISTRY_META_NAMESPACE } from '@mcp/types';
 import { config } from '../config/index.js';
 
 type TransportType = 'stdio' | 'streamable-http' | 'sse';
@@ -91,6 +91,7 @@ export interface ServerQuery {
 export interface SkillQuery {
   search?: string;
   source?: SkillSource | 'all';
+  provider_name?: string;
   category?: string;
   tags?: string;
   verified?: boolean;
@@ -453,8 +454,8 @@ export class DatabaseService {
     return Array.from(types);
   }
 
-  private extractNovaMeta(serverResponse: ServerResponse): NovaMeta | null {
-    const meta = serverResponse._meta?.[NOVA_META_NAMESPACE] as NovaMeta | undefined;
+  private extractRegistryMeta(serverResponse: ServerResponse): RegistryMeta | null {
+    const meta = serverResponse._meta?.[REGISTRY_META_NAMESPACE] as RegistryMeta | undefined;
     return meta ?? null;
   }
 
@@ -463,7 +464,7 @@ export class DatabaseService {
     const transportTypes = this.extractTransportTypes(server);
     const hasRemote = (server.remotes?.length ?? 0) > 0;
     const hasPackage = (server.packages?.length ?? 0) > 0;
-    const novaMeta = this.extractNovaMeta(serverResponse);
+    const registryMeta = this.extractRegistryMeta(serverResponse);
     const origin = serverResponse.origin ?? server.origin ?? providerName;
 
     const stmt = this.db.prepare(`
@@ -493,11 +494,11 @@ export class DatabaseService {
       transportTypes.join(','),
       hasRemote ? 1 : 0,
       hasPackage ? 1 : 0,
-      novaMeta?.category ?? null,
-      novaMeta?.tags?.join(',') ?? null,
-      novaMeta?.verified ? 1 : 0,
-      novaMeta?.featured ? 1 : 0,
-      novaMeta?.vendorOfficial ? 1 : 0,
+      registryMeta?.category ?? null,
+      registryMeta?.tags?.join(',') ?? null,
+      registryMeta?.verified ? 1 : 0,
+      registryMeta?.featured ? 1 : 0,
+      registryMeta?.vendorOfficial ? 1 : 0,
       providerName,
     );
   }
@@ -769,8 +770,8 @@ export class DatabaseService {
     const clonedResponse = structuredClone(original);
     clonedResponse.source = 'private';
     clonedResponse.origin = 'private';
-    delete (clonedResponse._meta as any)?.['com.mcp-nova.meta'];
-    clonedResponse._meta = { ...clonedResponse._meta, 'com.mcp-nova.meta': {} };
+    delete (clonedResponse._meta as any)?.['com.mcp-registry-runtime.meta'];
+    clonedResponse._meta = { ...clonedResponse._meta, 'com.mcp-registry-runtime.meta': {} };
 
     this.upsertServer(clonedResponse, 'private', '');
     return clonedResponse;
@@ -787,8 +788,8 @@ export class DatabaseService {
     const data = JSON.parse(row.data) as SkillResponse;
     const clonedResponse = structuredClone(data);
     clonedResponse.source = 'private';
-    delete (clonedResponse._meta as any)?.['com.mcp-nova.meta'];
-    clonedResponse._meta = { ...clonedResponse._meta, 'com.mcp-nova.meta': {} };
+    delete (clonedResponse._meta as any)?.['com.mcp-registry-runtime.meta'];
+    clonedResponse._meta = { ...clonedResponse._meta, 'com.mcp-registry-runtime.meta': {} };
 
     this.upsertSkill(clonedResponse, 'private', '');
     return clonedResponse;
@@ -806,10 +807,10 @@ export class DatabaseService {
     const clonedResponse = structuredClone(data);
     clonedResponse.agent.version = this.nextPrivateAgentVersion(name, version);
     clonedResponse.source = 'private';
-    delete (clonedResponse._meta as any)?.['com.mcp-nova.meta'];
+    delete (clonedResponse._meta as any)?.['com.mcp-registry-runtime.meta'];
     clonedResponse._meta = {
       ...clonedResponse._meta,
-      'com.mcp-nova.meta': {
+      'com.mcp-registry-runtime.meta': {
         clonedFrom: `${name}@${version}`,
       },
     };
@@ -856,14 +857,14 @@ export class DatabaseService {
 
   // ────────────────────────────── Skills ──────────────────────────────
 
-  private extractSkillNovaMeta(skillResponse: SkillResponse): NovaMeta | null {
-    const meta = skillResponse._meta?.[NOVA_META_NAMESPACE] as NovaMeta | undefined;
+  private extractSkillRegistryMeta(skillResponse: SkillResponse): RegistryMeta | null {
+    const meta = skillResponse._meta?.[REGISTRY_META_NAMESPACE] as RegistryMeta | undefined;
     return meta ?? null;
   }
 
   upsertSkill(skillResponse: SkillResponse, source: SkillSource, providerName: string): void {
     const skill = skillResponse.skill;
-    const novaMeta = this.extractSkillNovaMeta(skillResponse);
+    const registryMeta = this.extractSkillRegistryMeta(skillResponse);
 
     const stmt = this.db.prepare(`
       INSERT INTO skills (name, version, source, data, format, category, tags, verified, featured, provider_name, synced_at)
@@ -885,10 +886,10 @@ export class DatabaseService {
       source,
       JSON.stringify(skillResponse),
       skill.format,
-      novaMeta?.category ?? skill.category ?? null,
-      novaMeta?.tags?.join(',') ?? skill.tags?.join(',') ?? null,
-      novaMeta?.verified ? 1 : 0,
-      novaMeta?.featured ? 1 : 0,
+      registryMeta?.category ?? skill.category ?? null,
+      registryMeta?.tags?.join(',') ?? skill.tags?.join(',') ?? null,
+      registryMeta?.verified ? 1 : 0,
+      registryMeta?.featured ? 1 : 0,
       providerName,
     );
   }
@@ -982,6 +983,11 @@ export class DatabaseService {
       params.push(query.source);
     }
 
+    if (query.provider_name) {
+      conditions.push('provider_name = ?');
+      params.push(query.provider_name);
+    }
+
     if (query.category) {
       conditions.push('category = ?');
       params.push(query.category);
@@ -1067,14 +1073,14 @@ export class DatabaseService {
 
   // ────────────────────────────── Agents ──────────────────────────────
 
-  private extractAgentNovaMeta(agentResponse: AgentResponse): NovaMeta | null {
-    const meta = agentResponse._meta?.[NOVA_META_NAMESPACE] as NovaMeta | undefined;
+  private extractAgentRegistryMeta(agentResponse: AgentResponse): RegistryMeta | null {
+    const meta = agentResponse._meta?.[REGISTRY_META_NAMESPACE] as RegistryMeta | undefined;
     return meta ?? null;
   }
 
   upsertAgent(agentResponse: AgentResponse, source: AgentSource): void {
     const agent = agentResponse.agent;
-    const novaMeta = this.extractAgentNovaMeta(agentResponse);
+    const registryMeta = this.extractAgentRegistryMeta(agentResponse);
 
     const stmt = this.db.prepare(`
       INSERT INTO agents (name, version, source, data, subagent_type, category, tags, verified, featured, synced_at)
@@ -1096,10 +1102,10 @@ export class DatabaseService {
       source,
       JSON.stringify(agentResponse),
       agent.subagent_type,
-      novaMeta?.category ?? agent.category ?? null,
-      novaMeta?.tags?.join(',') ?? agent.tags?.join(',') ?? null,
-      novaMeta?.verified ? 1 : 0,
-      novaMeta?.featured ? 1 : 0
+      registryMeta?.category ?? agent.category ?? null,
+      registryMeta?.tags?.join(',') ?? agent.tags?.join(',') ?? null,
+      registryMeta?.verified ? 1 : 0,
+      registryMeta?.featured ? 1 : 0
     );
   }
 

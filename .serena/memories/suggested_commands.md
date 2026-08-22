@@ -1,6 +1,6 @@
 ---
 name: Suggested Commands
-description: Key development commands for the mcp-nova project (4-app monorepo)
+description: Key development commands for the mcp-registry-runtime project (4-app monorepo)
 type: project
 ---
 
@@ -23,15 +23,15 @@ npm run build                        # Build all workspaces
 npm run typecheck                    # Type check all workspaces
 
 # Workspace-specific
-npm run build -w @mcp-nova/registry
-npm run build -w @mcp-nova/runtime
-npm run build -w @mcp-nova/agent-runtime
-npm run build -w @mcp-nova/frontend
-npm run typecheck -w @mcp-nova/agent-runtime
+npm run build -w @mcp/registry
+npm run build -w @mcp/runtime
+npm run build -w @mcp/agent-runtime
+npm run build -w @mcp/frontend
+npm run typecheck -w @mcp/agent-runtime
 
 # Frontend Svelte check
 cd apps/frontend && npm run check    # svelte-check + TypeScript
-npm run check -w @mcp-nova/frontend
+npm run check -w @mcp/frontend
 ```
 
 # Docker
