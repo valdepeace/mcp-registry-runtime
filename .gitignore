@@ -1,32 +1,39 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
 build/
 .vite/
 .svelte-kit/
+
+# Data
 data/
 *.db
 *.db-journal
 *.db-wal
+
+# Env
 .env
 .env.*
 !.env.example
+
+# Logs
 *.log
-.DS_Store
-Thumbs.db
-.turbo/
-.claude/
-.opencode/
-.serena/cache/
 registry-err.txt
 registry-out.txt
 registry-proc.xml
 
+# OS
+.DS_Store
+Thumbs.db
 
-
-.nx/cache
-.nx/workspace-data
-
-# Editor / AI tooling (local only)
-.vscode/
+# Tooling / editors / AI assistants (local only)
+.claude/
 .crush/
+.github/
+.nx/
+.opencode/
 .serena/
+.turbo/
+.vscode/
