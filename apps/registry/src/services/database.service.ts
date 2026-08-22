@@ -9,9 +9,6 @@ import type {
   SkillDetail,
   SkillResponse,
   SkillSource,
-  AgentDetail,
-  AgentResponse,
-  AgentSource,
 } from '@mcp/types';
 import { REGISTRY_META_NAMESPACE } from '@mcp/types';
 import { config } from '../config/index.js';
@@ -56,22 +53,6 @@ export interface StoredSkill {
   synced_at: string | null;
 }
 
-export interface StoredAgent {
-  id: number;
-  name: string;
-  version: string;
-  source: AgentSource;
-  data: string;
-  subagent_type: string;
-  category: string | null;
-  tags: string | null;
-  verified: boolean;
-  featured: boolean;
-  created_at: string;
-  updated_at: string;
-  synced_at: string | null;
-}
-
 export interface ServerQuery {
   search?: string;
   transportType?: TransportType | TransportType[];
@@ -97,18 +78,6 @@ export interface SkillQuery {
   verified?: boolean;
   featured?: boolean;
   format?: string;
-  limit?: number;
-  offset?: number;
-}
-
-export interface AgentQuery {
-  search?: string;
-  source?: AgentSource | 'all';
-  category?: string;
-  tags?: string;
-  verified?: boolean;
-  featured?: boolean;
-  subagentType?: string;
   limit?: number;
   offset?: number;
 }
@@ -191,30 +160,6 @@ export class DatabaseService {
       CREATE INDEX IF NOT EXISTS idx_skills_featured ON skills(featured);
       CREATE INDEX IF NOT EXISTS idx_skills_format ON skills(format);
 
-      CREATE TABLE IF NOT EXISTS agents (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
-        version TEXT NOT NULL,
-        source TEXT NOT NULL CHECK (source IN ('registry', 'private')),
-        data TEXT NOT NULL,
-        subagent_type TEXT NOT NULL,
-        category TEXT,
-        tags TEXT,
-        verified INTEGER NOT NULL DEFAULT 0,
-        featured INTEGER NOT NULL DEFAULT 0,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-        synced_at TEXT,
-        UNIQUE(name, version)
-      );
-
-      CREATE INDEX IF NOT EXISTS idx_agents_name ON agents(name);
-      CREATE INDEX IF NOT EXISTS idx_agents_source ON agents(source);
-      CREATE INDEX IF NOT EXISTS idx_agents_subagent_type ON agents(subagent_type);
-      CREATE INDEX IF NOT EXISTS idx_agents_category ON agents(category);
-      CREATE INDEX IF NOT EXISTS idx_agents_verified ON agents(verified);
-      CREATE INDEX IF NOT EXISTS idx_agents_featured ON agents(featured);
-
       CREATE TABLE IF NOT EXISTS sync_status (
         id INTEGER PRIMARY KEY CHECK (id = 1),
         last_sync TEXT,
@@ -227,7 +172,7 @@ export class DatabaseService {
       CREATE TABLE IF NOT EXISTS provider_sync_log (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         provider_name TEXT NOT NULL,
-        entity_type TEXT NOT NULL CHECK (entity_type IN ('servers', 'skills', 'agents')),
+        entity_type TEXT NOT NULL CHECK (entity_type IN ('servers', 'skills')),
         entity_count INTEGER NOT NULL DEFAULT 0,
         status TEXT NOT NULL DEFAULT 'pending',
         error TEXT,
@@ -721,7 +666,7 @@ export class DatabaseService {
 
   // ── Provider sync log ──────────────────────────────────────────────
 
-  logProviderSync(providerName: string, entityType: 'servers' | 'skills' | 'agents', count: number, status: 'success' | 'error', error?: string): void {
+  logProviderSync(providerName: string, entityType: 'servers' | 'skills', count: number, status: 'success' | 'error', error?: string): void {
     const stmt = this.db.prepare(`
       INSERT INTO provider_sync_log (provider_name, entity_type, entity_count, status, error)
       VALUES (?, ?, ?, ?, ?)
@@ -795,48 +740,7 @@ export class DatabaseService {
     return clonedResponse;
   }
 
-  cloneAgent(name: string, version: string): AgentResponse | null {
-    const stmt = this.db.prepare<[string, string], StoredAgent>(`
-      SELECT * FROM agents WHERE name = ? AND version = ?
-    `);
-    const row = stmt.get(name, version);
-    if (!row) return null;
-    if (row.source === 'private') return null;
 
-    const data = JSON.parse(row.data) as AgentResponse;
-    const clonedResponse = structuredClone(data);
-    clonedResponse.agent.version = this.nextPrivateAgentVersion(name, version);
-    clonedResponse.source = 'private';
-    delete (clonedResponse._meta as any)?.['com.mcp-registry-runtime.meta'];
-    clonedResponse._meta = {
-      ...clonedResponse._meta,
-      'com.mcp-registry-runtime.meta': {
-        clonedFrom: `${name}@${version}`,
-      },
-    };
-
-    this.upsertAgent(clonedResponse, 'private');
-    return clonedResponse;
-  }
-
-  private nextPrivateAgentVersion(name: string, version: string): string {
-    const baseVersion = version.endsWith('-private') || /-private-\d+$/.test(version)
-      ? version
-      : `${version}-private`;
-
-    if (!this.getAgent(name, baseVersion)) {
-      return baseVersion;
-    }
-
-    for (let i = 2; i < 1000; i += 1) {
-      const candidate = `${baseVersion}-${i}`;
-      if (!this.getAgent(name, candidate)) {
-        return candidate;
-      }
-    }
-
-    throw new Error(`Unable to allocate private version for ${name}@${version}`);
-  }
 
   createUser(username: string, passwordHash: string): void {
     const stmt = this.db.prepare(`
@@ -1066,173 +970,6 @@ export class DatabaseService {
   deleteAllSkillVersions(name: string): number {
     const stmt = this.db.prepare(`
       DELETE FROM skills WHERE name = ? AND source != 'registry'
-    `);
-    const result = stmt.run(name);
-    return result.changes;
-  }
-
-  // ────────────────────────────── Agents ──────────────────────────────
-
-  private extractAgentRegistryMeta(agentResponse: AgentResponse): RegistryMeta | null {
-    const meta = agentResponse._meta?.[REGISTRY_META_NAMESPACE] as RegistryMeta | undefined;
-    return meta ?? null;
-  }
-
-  upsertAgent(agentResponse: AgentResponse, source: AgentSource): void {
-    const agent = agentResponse.agent;
-    const registryMeta = this.extractAgentRegistryMeta(agentResponse);
-
-    const stmt = this.db.prepare(`
-      INSERT INTO agents (name, version, source, data, subagent_type, category, tags, verified, featured, synced_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
-      ON CONFLICT(name, version) DO UPDATE SET
-        data = excluded.data,
-        subagent_type = excluded.subagent_type,
-        category = excluded.category,
-        tags = excluded.tags,
-        verified = excluded.verified,
-        featured = excluded.featured,
-        updated_at = datetime('now'),
-        synced_at = CASE WHEN excluded.source = 'registry' THEN datetime('now') ELSE synced_at END
-    `);
-
-    stmt.run(
-      agent.name,
-      agent.version,
-      source,
-      JSON.stringify(agentResponse),
-      agent.subagent_type,
-      registryMeta?.category ?? agent.category ?? null,
-      registryMeta?.tags?.join(',') ?? agent.tags?.join(',') ?? null,
-      registryMeta?.verified ? 1 : 0,
-      registryMeta?.featured ? 1 : 0
-    );
-  }
-
-  bulkUpsertAgents(agents: AgentResponse[]): void {
-    console.log(`[Database] Bulk upserting ${agents.length} agents...`);
-    const transaction = this.db.transaction((agents: AgentResponse[]) => {
-      for (const agent of agents) {
-        try {
-          this.upsertAgent(agent, 'registry');
-        } catch (err) {
-          console.error(`[Database] Failed to upsert agent ${agent.agent?.name}@${agent.agent?.version}:`, err);
-          throw err;
-        }
-      }
-    });
-    transaction(agents);
-    console.log(`[Database] Bulk upsert agents complete`);
-  }
-
-  getAgent(name: string, version: string): AgentResponse | null {
-    const stmt = this.db.prepare<[string, string], StoredAgent>(`
-      SELECT * FROM agents WHERE name = ? AND version = ?
-    `);
-    const row = stmt.get(name, version);
-    if (!row) return null;
-    const data = JSON.parse(row.data) as AgentResponse;
-    return { ...data, source: row.source as AgentSource };
-  }
-
-  getLatestAgent(name: string): AgentResponse | null {
-    const stmt = this.db.prepare<[string], StoredAgent>(`
-      SELECT * FROM agents WHERE name = ? ORDER BY updated_at DESC LIMIT 1
-    `);
-    const row = stmt.get(name);
-    if (!row) return null;
-    const data = JSON.parse(row.data) as AgentResponse;
-    return { ...data, source: row.source as AgentSource };
-  }
-
-  getAgentVersions(name: string): AgentResponse[] {
-    const stmt = this.db.prepare<[string], StoredAgent>(`
-      SELECT * FROM agents WHERE name = ? ORDER BY updated_at DESC
-    `);
-    const rows = stmt.all(name);
-    return rows.map(row => {
-      const data = JSON.parse(row.data) as AgentResponse;
-      return { ...data, source: row.source as AgentSource };
-    });
-  }
-
-  queryAgents(query: AgentQuery = {}): { agents: AgentResponse[]; total: number } {
-    const conditions: string[] = [];
-    const params: (string | number)[] = [];
-
-    if (query.search) {
-      conditions.push("(name LIKE ? OR json_extract(data, '$.agent.description') LIKE ? OR json_extract(data, '$.agent.instructions') LIKE ?)");
-      params.push(`%${query.search}%`, `%${query.search}%`, `%${query.search}%`);
-    }
-
-    if (query.source && query.source !== 'all') {
-      conditions.push('source = ?');
-      params.push(query.source);
-    }
-
-    if (query.subagentType) {
-      conditions.push('subagent_type = ?');
-      params.push(query.subagentType);
-    }
-
-    if (query.category) {
-      conditions.push('category = ?');
-      params.push(query.category);
-    }
-
-    if (query.tags) {
-      const tagList = query.tags.split(',');
-      const tagConditions = tagList.map(() => 'tags LIKE ?');
-      conditions.push(`(${tagConditions.join(' OR ')})`);
-      tagList.forEach(t => params.push(`%${t.trim()}%`));
-    }
-
-    if (query.verified !== undefined) {
-      conditions.push('verified = ?');
-      params.push(query.verified ? 1 : 0);
-    }
-
-    if (query.featured !== undefined) {
-      conditions.push('featured = ?');
-      params.push(query.featured ? 1 : 0);
-    }
-
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-    const limit = query.limit ?? 50;
-    const offset = query.offset ?? 0;
-
-    const countStmt = this.db.prepare<(string | number)[], { count: number }>(`
-      SELECT COUNT(*) as count FROM agents ${whereClause}
-    `);
-    const { count: total } = countStmt.get(...params) ?? { count: 0 };
-
-    const stmt = this.db.prepare<(string | number)[], StoredAgent>(`
-      SELECT * FROM agents ${whereClause}
-      ORDER BY updated_at DESC
-      LIMIT ? OFFSET ?
-    `);
-    const rows = stmt.all(...params, limit, offset);
-
-    return {
-      agents: rows.map(row => {
-        const agentResponse = JSON.parse(row.data) as AgentResponse;
-        return { ...agentResponse, source: row.source as AgentSource };
-      }),
-      total,
-    };
-  }
-
-  deleteAgent(name: string, version: string): boolean {
-    const stmt = this.db.prepare(`
-      DELETE FROM agents WHERE name = ? AND version = ? AND source != 'registry'
-    `);
-    const result = stmt.run(name, version);
-    return result.changes > 0;
-  }
-
-  deleteAllAgentVersions(name: string): number {
-    const stmt = this.db.prepare(`
-      DELETE FROM agents WHERE name = ? AND source != 'registry'
     `);
     const result = stmt.run(name);
     return result.changes;

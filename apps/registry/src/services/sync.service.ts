@@ -1,6 +1,5 @@
 import { officialRegistryService } from './official-registry.service.js';
 import { skillsRegistryService } from './skills-registry.service.js';
-import { agentsRegistryService } from './agents-registry.service.js';
 import { databaseService } from './database.service.js';
 import { config } from '../config/index.js';
 import type { ProviderSyncResult } from './providers/types.js';
@@ -9,7 +8,7 @@ import { syncEventBus } from './sync-event-bus.js';
 export class SyncService {
   private syncInterval: ReturnType<typeof setInterval> | null = null;
   private isSyncing = false;
-  private syncingTypes = new Set<'servers' | 'skills' | 'agents'>();
+  private syncingTypes = new Set<'servers' | 'skills'>();
 
   async sync(): Promise<void> {
     if (this.isSyncing) {
@@ -24,10 +23,9 @@ export class SyncService {
       console.log('[Sync] Starting full sync...');
       const startTime = Date.now();
 
-      const [serversResult, skillsResult, agentsResult] = await Promise.all([
+      const [serversResult, skillsResult] = await Promise.all([
         this.syncServers(),
         this.syncSkills(),
-        this.syncAgents(),
       ]);
 
       const elapsed = Date.now() - startTime;
@@ -38,9 +36,6 @@ export class SyncService {
       }
       if (skillsResult) {
         parts.push(`Skills: ${skillsResult.skills} (${skillsResult.providers})`);
-      }
-      if (agentsResult !== null) {
-        parts.push(`Agents: ${agentsResult}`);
       }
 
       console.log(`[Sync] Completed. ${parts.join(', ')} (${elapsed}ms)`);
@@ -134,22 +129,8 @@ export class SyncService {
     return { skills: totalSkills, providers: providersStr };
   }
 
-  private async syncAgents(): Promise<number | null> {
-    if (!agentsRegistryService.isConfigured) {
-      console.log('[Sync] Agents registry not configured');
-      return null;
-    }
-    console.log('[Sync] Starting agents sync...');
-    const agents = await agentsRegistryService.fetchAllAgents();
-    databaseService.bulkUpsertAgents(agents);
 
-    databaseService.logProviderSync('agents-registry', 'agents', agents.length, 'success');
-
-    console.log(`[Sync] Agents: ${agents.length}`);
-    return agents.length;
-  }
-
-  private makeProgress(providerName: string, entityType: 'servers' | 'skills' | 'agents') {
+  private makeProgress(providerName: string, entityType: 'servers' | 'skills') {
     return (message: string, current?: number, total?: number) => {
       syncEventBus.emitSync({
         type: 'provider:progress',
@@ -163,7 +144,7 @@ export class SyncService {
     };
   }
   private async runProviderSync(
-    entityType: 'servers' | 'skills' | 'agents',
+    entityType: 'servers' | 'skills',
     providerName: string,
     fn: () => Promise<number>,
   ): Promise<void> {
@@ -198,7 +179,7 @@ export class SyncService {
     }
   }
 
-  async syncByType(type: 'servers' | 'skills' | 'agents'): Promise<void> {
+  async syncByType(type: 'servers' | 'skills'): Promise<void> {
     if (this.syncingTypes.has(type)) {
       console.log(`[Sync] Already syncing ${type}, skipping...`);
       return;
@@ -215,9 +196,6 @@ export class SyncService {
         case 'skills':
           await this.syncSkills();
           break;
-        case 'agents':
-          await this.syncAgents();
-          break;
       }
       databaseService.updateSyncStatus('success');
     } catch (err) {
@@ -228,7 +206,7 @@ export class SyncService {
     }
   }
 
-  async syncProvider(type: 'servers' | 'skills' | 'agents', providerName: string): Promise<void> {
+  async syncProvider(type: 'servers' | 'skills', providerName: string): Promise<void> {
     console.log(`[Sync] Starting provider sync: ${providerName} (${type})...`);
 
     if (type === 'servers') {
@@ -272,8 +250,6 @@ export class SyncService {
         }
         return skills.length;
       });
-    } else if (type === 'agents') {
-      await this.syncAgents();
     }
   }
 
@@ -329,19 +305,6 @@ export class SyncService {
       });
     }
 
-    if (agentsRegistryService.isConfigured) {
-      const name = 'agents-registry';
-      const stat = statsMap.get(`${name}:agents`);
-      allProviders.push({
-        providerName: name,
-        entityType: 'agents',
-        entityCount: stat?.entityCount ?? 0,
-        lastSync: stat?.lastSync ?? null,
-        lastStatus: stat?.lastStatus ?? 'pending',
-        lastError: stat?.lastError ?? null,
-        configured: true,
-      });
-    }
 
     return allProviders;
   }

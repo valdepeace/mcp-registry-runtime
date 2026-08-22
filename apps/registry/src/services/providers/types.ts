@@ -1,4 +1,4 @@
-import type { ServerResponse, SkillResponse, AgentResponse } from '@mcp/types';
+import type { ServerResponse, SkillResponse } from '@mcp/types';
 
 export type ProgressCallback = (message: string, current?: number, total?: number) => void;
 
@@ -14,15 +14,9 @@ export interface SkillsProvider {
   isConfigured(): boolean;
 }
 
-export interface AgentsProvider {
-  name: string;
-  fetchAllAgents(onProgress?: ProgressCallback): Promise<AgentResponse[]>;
-  isConfigured(): boolean;
-}
-
 export interface ProviderSyncResult {
   provider: string;
-  entityType: 'servers' | 'skills' | 'agents';
+  entityType: 'servers' | 'skills';
   count: number;
   error?: string;
 }

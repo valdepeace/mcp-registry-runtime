@@ -3,7 +3,7 @@ import { EventEmitter } from 'events';
 export interface SyncEvent {
   type: 'provider:start' | 'provider:complete' | 'provider:error' | 'provider:progress';
   providerName: string;
-  entityType: 'servers' | 'skills' | 'agents';
+  entityType: 'servers' | 'skills';
   timestamp: string;
   count?: number;
   error?: string;

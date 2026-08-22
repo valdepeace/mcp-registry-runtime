@@ -25,9 +25,6 @@
           <a href="/skills" class="text-sm text-gray-600 hover:text-gray-900">
             Skills
           </a>
-          <a href="/agents" class="text-sm text-gray-600 hover:text-gray-900">
-            Agents
-          </a>
           {#if $isAuthenticated}
             <a href="/admin" class="text-sm text-gray-600 hover:text-gray-900">
               Admin
@@ -35,14 +32,8 @@
             <a href="/admin/runtime" class="text-sm text-gray-600 hover:text-gray-900">
               Runtime
             </a>
-            <a href="/admin/agent-runtime" class="text-sm text-gray-600 hover:text-gray-900">
-              Agent Runtime
-            </a>
             <a href="/admin/pm2" class="text-sm text-gray-600 hover:text-gray-900">
               PM2
-            </a>
-            <a href="/admin/ollama" class="text-sm text-gray-600 hover:text-gray-900">
-              Ollama
             </a>
             <button
               type="button"

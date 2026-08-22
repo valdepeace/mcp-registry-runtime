@@ -5,6 +5,8 @@ Private MCP (Model Context Protocol) server registry with official registry sync
 ## Features
 
 - **Sync with Official Registry** - Automatic periodic sync from the official MCP registry
+- **Skills Catalog** - Skills synced from external providers (Vercel Labs, skills.sh, Smithery)
+- **Runtime** - Launch MCP servers from the catalog as PM2 processes, with healthchecks, logs and MCP protocol inspection
 - **Private Servers** - Add and manage your own MCP servers
 - **Admin Dashboard** - Web UI for managing private servers and monitoring sync status
 - **API Compatible** - Compatible with the official MCP Registry API spec
@@ -15,15 +17,14 @@ Private MCP (Model Context Protocol) server registry with official registry sync
 
 ```
 ├── apps/
-│   ├── backend/      # Express.js API server
-│   │   ├── src/
-│   │   ├── package.json
-│   │   └── Dockerfile
-│   └── frontend/     # SvelteKit web UI
-│       ├── src/
-│       ├── package.json
-│       └── Dockerfile
+│   ├── registry/     # Express.js catalog API (:3000)
+│   ├── runtime/      # Express.js PM2 runtime API (:3001)
+│   └── frontend/     # SvelteKit web UI (:5173)
+├── packages/
+│   └── types/        # Shared Zod schemas and TypeScript types
+├── docs/             # Roadmaps and design notes
 ├── docker-compose.yml
+├── nx.json
 ├── package.json      # Monorepo workspace config
 └── AGENTS.md
 ```
@@ -34,12 +35,13 @@ Private MCP (Model Context Protocol) server registry with official registry sync
 # Install all dependencies
 npm install
 
-# Start both backend and frontend in dev mode
+# Start every app in dev mode
 npm run dev
 
 # Or start individually
-npm run dev:backend   # Backend on http://localhost:3000
-npm run dev:frontend  # Frontend on http://localhost:5173
+npm run dev:registry   # Registry on http://localhost:3000
+npm run dev:runtime    # Runtime on http://localhost:3001
+npm run dev:frontend   # Frontend on http://localhost:5173
 ```
 
 ## Docker
@@ -50,15 +52,16 @@ docker-compose up -d
 
 # Access:
 # - Frontend: http://localhost:5173
-# - Backend API: http://localhost:3000
+# - Registry API: http://localhost:3000
+# - Runtime API: http://localhost:3001
 ```
 
 ## Development
 
-### Backend (Express + TypeScript)
+### Backends (Express + TypeScript)
 
 ```bash
-cd apps/backend
+cd apps/registry   # or apps/runtime
 npm install
 npm run dev        # Hot reload dev server
 npm run build      # Compile TypeScript

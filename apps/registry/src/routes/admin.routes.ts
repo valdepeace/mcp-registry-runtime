@@ -3,7 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { databaseService, syncService } from '../services/index.js';
 import { authMiddleware, requireAdmin, validateBody, AuthenticatedRequest } from '../middleware/index.js';
-import { CreateServerSchema, UpdateServerSchema, CreateSkillSchema, UpdateSkillSchema, CreateAgentSchema, UpdateAgentSchema } from '@mcp/types';
+import { CreateServerSchema, UpdateServerSchema, CreateSkillSchema, UpdateSkillSchema } from '@mcp/types';
 import { config } from '../config/index.js';
 import { z } from 'zod';
 import type { Package, RemoteTransport } from '@mcp/types';
@@ -90,15 +90,15 @@ router.get('/sync/providers', (_req: AuthenticatedRequest, res: Response) => {
 
 /**
  * POST /admin/sync/trigger/:type
- * Trigger sync for a specific entity type (servers | skills | agents)
+ * Trigger sync for a specific entity type (servers | skills)
  */
 router.post('/sync/trigger/:type', async (req: AuthenticatedRequest, res: Response) => {
   const type = req.params.type as string;
-  if (!['servers', 'skills', 'agents'].includes(type)) {
-    res.status(400).json({ error: 'Invalid type. Use: servers, skills, agents' });
+  if (!['servers', 'skills'].includes(type)) {
+    res.status(400).json({ error: 'Invalid type. Use: servers, skills' });
     return;
   }
-  syncService.syncByType(type as 'servers' | 'skills' | 'agents').catch(
+  syncService.syncByType(type as 'servers' | 'skills').catch(
     err => console.error(`[Admin] Manual ${type} sync failed:`, err),
   );
   res.json({ message: `${type} sync triggered`, status: 'syncing' });
@@ -112,11 +112,11 @@ router.post('/sync/trigger/:type', async (req: AuthenticatedRequest, res: Respon
 router.post('/sync/trigger/:type/:providerName', async (req: AuthenticatedRequest, res: Response) => {
   const type = req.params.type as string;
   const providerName = decodeURIComponent(req.params.providerName as string);
-  if (!['servers', 'skills', 'agents'].includes(type)) {
+  if (!['servers', 'skills'].includes(type)) {
     res.status(400).json({ error: 'Invalid type' });
     return;
   }
-  syncService.syncProvider(type as 'servers' | 'skills' | 'agents', providerName).catch(
+  syncService.syncProvider(type as 'servers' | 'skills', providerName).catch(
     err => console.error(`[Admin] Manual sync ${type}/${providerName} failed:`, err),
   );
   res.json({ message: `${type}/${providerName} sync triggered`, status: 'syncing' });
@@ -203,25 +203,6 @@ router.post('/skills/clone', async (req: AuthenticatedRequest, res: Response) =>
     return;
   }
   res.json({ skill: cloned });
-  return;
-});
-
-/**
- * POST /admin/agents/clone
- * Clone a registry agent to private
- */
-router.post('/agents/clone', async (req: AuthenticatedRequest, res: Response) => {
-  const { name, version } = req.body;
-  if (!name || !version) {
-    res.status(400).json({ error: 'name and version are required' });
-    return;
-  }
-  const cloned = databaseService.cloneAgent(name, version);
-  if (!cloned) {
-    res.status(404).json({ error: 'Agent not found or is already private' });
-    return;
-  }
-  res.json({ agent: cloned, message: `Cloned as ${cloned.agent.name}@${cloned.agent.version}` });
   return;
 });
 
@@ -340,14 +321,13 @@ router.delete('/servers/:serverName', (req: AuthenticatedRequest, res: Response)
 
 /**
  * GET /admin/stats
- * Get registry statistics (servers, skills, agents)
+ * Get registry statistics (servers, skills)
  */
 router.get('/stats', (_req: AuthenticatedRequest, res: Response) => {
   const allServers = databaseService.queryServers({ limit: 10000 });
   const registryServers = databaseService.queryServers({ source: 'registry', limit: 10000 });
   const privateServers = databaseService.queryServers({ source: 'private', limit: 10000 });
   const allSkills = databaseService.querySkills({ limit: 10000 });
-  const allAgents = databaseService.queryAgents({ limit: 10000 });
 
   const transportCounts: Record<string, number> = {
     stdio: 0,
@@ -379,11 +359,6 @@ router.get('/stats', (_req: AuthenticatedRequest, res: Response) => {
       total: allSkills.total,
       registry: databaseService.querySkills({ source: 'registry', limit: 10000 }).total,
       private: databaseService.querySkills({ source: 'private', limit: 10000 }).total,
-    },
-    agents: {
-      total: allAgents.total,
-      registry: databaseService.queryAgents({ source: 'registry', limit: 10000 }).total,
-      private: databaseService.queryAgents({ source: 'private', limit: 10000 }).total,
     },
     syncStatus: syncService.getStatus(),
   });
@@ -499,118 +474,6 @@ router.delete('/skills/:skillName', (req: AuthenticatedRequest, res: Response) =
   }
 
   res.json({ message: `Deleted ${deletedCount} skill version(s)` });
-  return;
-});
-
-// ────────────────────────────── Agents Admin ──────────────────────────────
-
-/**
- * POST /admin/agents
- * Create a new private agent
- */
-router.post(
-  '/agents',
-  validateBody(CreateAgentSchema),
-  (req: AuthenticatedRequest, res: Response) => {
-    const { source = 'private', ...agentDetail } = req.body;
-
-    const existing = databaseService.getAgent(agentDetail.name, agentDetail.version);
-    if (existing) {
-      res.status(409).json({ error: 'Agent with this name and version already exists' });
-      return;
-    }
-
-    const agentResponse = {
-      agent: agentDetail,
-      _meta: {
-        'io.modelcontextprotocol.registry/private': {
-          createdBy: req.user?.username,
-          createdAt: new Date().toISOString(),
-        },
-      },
-    };
-
-    databaseService.upsertAgent(agentResponse, source);
-
-    res.status(201).json({ ...agentResponse, source });
-    return;
-  }
-);
-
-/**
- * PUT /admin/agents/:agentName/versions/:version
- * Update a private agent
- */
-router.put(
-  '/agents/:agentName/versions/:version',
-  validateBody(UpdateAgentSchema),
-  (req: AuthenticatedRequest, res: Response) => {
-    const agentName = decodeURIComponent(req.params.agentName as string);
-    const version = decodeURIComponent(req.params.version as string);
-    const updates = req.body;
-
-    const existing = databaseService.getAgent(agentName, version);
-    if (!existing) {
-      res.status(404).json({ error: 'Agent not found' });
-      return;
-    }
-
-    if (existing.source === 'registry') {
-      res.status(403).json({ error: 'Cannot modify registry agents' });
-      return;
-    }
-
-    const updatedAgent = {
-      agent: { ...existing.agent, ...updates, name: agentName, version },
-      _meta: {
-        ...existing._meta,
-        'io.modelcontextprotocol.registry/private': {
-          ...(existing._meta?.['io.modelcontextprotocol.registry/private'] as Record<string, unknown> || {}),
-          updatedBy: req.user?.username,
-          updatedAt: new Date().toISOString(),
-        },
-      },
-    };
-
-    databaseService.upsertAgent(updatedAgent, 'private');
-
-    res.json(updatedAgent);
-    return;
-  }
-);
-
-/**
- * DELETE /admin/agents/:agentName/versions/:version
- * Delete a specific version of a private agent
- */
-router.delete('/agents/:agentName/versions/:version', (req: AuthenticatedRequest, res: Response) => {
-  const agentName = decodeURIComponent(req.params.agentName as string);
-  const version = decodeURIComponent(req.params.version as string);
-
-  const deleted = databaseService.deleteAgent(agentName, version);
-  if (!deleted) {
-    res.status(404).json({ error: 'Agent not found or is not a private agent' });
-    return;
-  }
-
-  res.json({ message: 'Agent deleted successfully' });
-  return;
-});
-
-/**
- * DELETE /admin/agents/:agentName
- * Delete all versions of a private agent
- */
-router.delete('/agents/:agentName', (req: AuthenticatedRequest, res: Response) => {
-  const agentName = decodeURIComponent(req.params.agentName as string);
-
-  const deletedCount = databaseService.deleteAllAgentVersions(agentName);
-  if (deletedCount === 0) {
-    res.status(404).json({ error: 'Agent not found or has no private versions' });
-    return;
-  }
-
-  res.json({ message: `Deleted ${deletedCount} agent version(s)` });
   return;
 });
 

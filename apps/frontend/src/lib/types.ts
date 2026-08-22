@@ -17,11 +17,6 @@ import type {
   SkillSource,
   SkillCategory,
   SkillFormat,
-  AgentDetail,
-  AgentResponse,
-  AgentSource,
-  AgentCategory,
-  AgentType,
 } from '@mcp/types';
 
 import { REGISTRY_META_NAMESPACE } from '@mcp/types';
@@ -55,11 +50,6 @@ export type {
   SkillSource,
   SkillCategory,
   SkillFormat,
-  AgentDetail,
-  AgentResponse,
-  AgentSource,
-  AgentCategory,
-  AgentType,
 } from '@mcp/types';
 
 export { REGISTRY_META_NAMESPACE } from '@mcp/types';
@@ -89,32 +79,6 @@ export const SKILL_CATEGORIES: { value: SkillCategory; label: string }[] = [
   { value: 'backend', label: 'Backend' },
   { value: 'devops', label: 'DevOps' },
   { value: 'other', label: 'Other' },
-];
-
-export const AGENT_CATEGORIES: { value: AgentCategory; label: string }[] = [
-  { value: 'ai', label: 'AI & ML' },
-  { value: 'data', label: 'Data' },
-  { value: 'development', label: 'Development' },
-  { value: 'infrastructure', label: 'Infrastructure' },
-  { value: 'integration', label: 'Integration' },
-  { value: 'security', label: 'Security' },
-  { value: 'productivity', label: 'Productivity' },
-  { value: 'frontend', label: 'Frontend' },
-  { value: 'backend', label: 'Backend' },
-  { value: 'devops', label: 'DevOps' },
-  { value: 'qa', label: 'QA' },
-  { value: 'other', label: 'Other' },
-];
-
-export const AGENT_TYPES: { value: AgentType; label: string }[] = [
-  { value: 'backend-engineer', label: 'Backend Engineer' },
-  { value: 'frontend-engineer', label: 'Frontend Engineer' },
-  { value: 'devops-engineer', label: 'DevOps Engineer' },
-  { value: 'explore', label: 'Explorer' },
-  { value: 'general', label: 'General' },
-  { value: 'qa-back', label: 'QA Backend' },
-  { value: 'qa-front', label: 'QA Frontend' },
-  { value: 'custom', label: 'Custom' },
 ];
 
 export const SKILL_FORMATS: { value: SkillFormat; label: string }[] = [
@@ -199,11 +163,6 @@ export interface RegistryStats {
     byTransport: Record<string, number>;
   };
   skills: {
-    total: number;
-    registry: number;
-    private: number;
-  };
-  agents: {
     total: number;
     registry: number;
     private: number;
@@ -324,19 +283,10 @@ export interface RuntimeLogsResponse {
   logs: string;
 }
 
-// ── Skills/Agents list types ─────────────────────────────────────────────────
+// ── Skills list types ─────────────────────────────────────────────────
 
 export interface SkillListResponse {
   skills: SkillResponse[];
-  metadata?: {
-    nextCursor?: string;
-    count?: number;
-    total?: number;
-  };
-}
-
-export interface AgentListResponse {
-  agents: AgentResponse[];
   metadata?: {
     nextCursor?: string;
     count?: number;
@@ -357,121 +307,4 @@ export interface SkillListParams {
   provider_name?: string;
 }
 
-export interface AgentListParams {
-  cursor?: string;
-  limit?: number;
-  search?: string;
-  category?: AgentCategory;
-  tags?: string;
-  verified?: boolean;
-  featured?: boolean;
-  subagent_type?: AgentType;
-  source?: AgentSource | 'all';
-}
 
-// ── Agent Runtime types ──────────────────────────────────────────────────────
-
-export interface AgentInstance {
-  id: string;
-  agent_name: string;
-  agent_version: string;
-  status: string;
-  exec_cmd: string;
-  exec_args: string | null;
-  env_json: string | null;
-  resolved_skills: string | null;
-  resolved_mcp_instances: string | null;
-  composed_prompt: string | null;
-  pm2_name: string | null;
-  pid: number | null;
-  uptime_ms: number | null;
-  restart_count: number | null;
-  last_exit_code: number | null;
-  last_error: string | null;
-  last_started_at: string | null;
-  last_stopped_at: string | null;
-  last_invoked_at: string | null;
-  last_composed_at: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface AgentInstanceListResponse {
-  instances: AgentInstance[];
-}
-
-export interface AgentInstanceResponse {
-  instance: AgentInstance;
-}
-
-export interface AgentComposeResponse {
-  composed: {
-    agent: AgentDetail;
-    resolvedSkills: { name: string; version: string; content: string; format: string }[];
-    resolvedMCPServers: { name: string; version: string }[];
-    composedPrompt: string;
-  };
-}
-
-export interface AgentInvokeResponse {
-  instance: AgentInstance;
-  output: string;
-}
-
-export interface AgentInvocation {
-  id: number;
-  instance_id: string;
-  input: string;
-  output: string | null;
-  status: string;
-  error: string | null;
-  duration_ms: number | null;
-  created_at: string;
-}
-
-export interface AgentRuntimeHealth {
-  status: 'ok';
-  timestamp: string;
-  instances: number;
-}
-
-// ── Ollama ────────────────────────────────────────────────────────────────────
-
-export interface OllamaModelDetails {
-  parent_model: string;
-  format: string;
-  family: string;
-  families: string[] | null;
-  parameter_size: string;
-  quantization_level: string;
-}
-
-export interface OllamaModel {
-  name: string;
-  model: string;
-  modified_at: string;
-  size: number;
-  digest: string;
-  details: OllamaModelDetails;
-}
-
-export interface OllamaRunningModel {
-  name: string;
-  model: string;
-  size: number;
-  digest: string;
-  expires_at: string;
-  size_vram: number;
-  details: OllamaModelDetails;
-}
-
-export interface OllamaStatus {
-  running: boolean;
-  version: string | null;
-}
-
-export type OllamaPullEvent =
-  | { type: 'status'; status: string }
-  | { type: 'progress'; status: string; digest?: string; total: number; completed: number }
-  | { type: 'complete'; status: string }
-  | { type: 'error'; error: string };

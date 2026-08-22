@@ -3,7 +3,7 @@
 
   interface Props {
     providerName: string;
-    entityType: 'servers' | 'skills' | 'agents';
+    entityType: 'servers' | 'skills';
     entityCount: number;
     lastSync: string | null;
     lastStatus: string;
@@ -38,11 +38,10 @@
   const entityIcon: Record<string, string> = {
     servers: '\u{1F4E1}',
     skills: '\u{1F9E9}',
-    agents: '\u{1F916}',
   };
 
   const entityLabel = $derived(
-    entityType === 'servers' ? 'MCPs' : entityType === 'skills' ? 'Skills' : 'Agents'
+    entityType === 'servers' ? 'MCPs' : 'Skills'
   );
 
   function formatDate(dateStr: string | null): string {

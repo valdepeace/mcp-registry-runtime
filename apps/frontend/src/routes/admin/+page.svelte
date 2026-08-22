@@ -208,11 +208,6 @@
         <div class="text-xs text-gray-500 mt-1">{stats.skills.registry} registry, {stats.skills.private} private</div>
       </div>
       <div class="bg-white rounded-lg shadow p-6">
-        <div class="text-sm text-gray-500 mb-1">Total Agents</div>
-        <div class="text-3xl font-bold text-indigo-600">{stats.agents.total}</div>
-        <div class="text-xs text-gray-500 mt-1">{stats.agents.registry} registry, {stats.agents.private} private</div>
-      </div>
-      <div class="bg-white rounded-lg shadow p-6">
         <div class="text-sm text-gray-500 mb-1">Sync Status</div>
         <div class="text-lg font-semibold capitalize {stats.syncStatus.status === 'success' ? 'text-green-600' : stats.syncStatus.status === 'error' ? 'text-red-600' : 'text-yellow-600'}">
           {stats.syncStatus.isSyncing ? 'Syncing...' : stats.syncStatus.status}
@@ -241,7 +236,7 @@
           {#each providers as provider (provider.providerName + provider.entityType)}
             <ProviderCard
               providerName={provider.providerName}
-              entityType={provider.entityType as 'servers' | 'skills' | 'agents'}
+              entityType={provider.entityType as 'servers' | 'skills'}
               entityCount={provider.entityCount}
               lastSync={provider.lastSync}
               lastStatus={provider.lastStatus}
@@ -284,10 +279,6 @@
       <a href="/admin/skills" class="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow">
         <h3 class="font-semibold text-gray-900">Manage Skills</h3>
         <p class="text-sm text-gray-600 mt-1">{stats.skills.total} skills registered</p>
-      </a>
-      <a href="/admin/agents" class="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow">
-        <h3 class="font-semibold text-gray-900">Manage Agents</h3>
-        <p class="text-sm text-gray-600 mt-1">{stats.agents.total} agents registered</p>
       </a>
     </div>
 

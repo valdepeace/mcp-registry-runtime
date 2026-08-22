@@ -4,10 +4,9 @@ import { validateQuery } from '../middleware/index.js';
 import {
   ListServersQuerySchema,
   ListSkillsQuerySchema,
-  ListAgentsQuerySchema,
   type ServerCategory,
 } from '@mcp/types';
-import type { SkillCategory, AgentCategory, SkillFormat, AgentType } from '@mcp/types';
+import type { SkillCategory, SkillFormat } from '@mcp/types';
 
 const router = Router();
 
@@ -222,100 +221,6 @@ router.get('/skills/:skillName/versions/:version', (req: Request, res: Response)
   }
 
   res.json(skill);
-  return;
-});
-
-/**
- * GET /v0.1/agents
- * List all agents with optional filters
- */
-router.get(
-  '/agents',
-  validateQuery(ListAgentsQuerySchema),
-  (req: Request, res: Response) => {
-    const query = (req as any).validatedQuery || req.query as {
-      cursor?: string;
-      limit?: number;
-      search?: string;
-      category?: AgentCategory;
-      tags?: string;
-      verified?: boolean;
-      featured?: boolean;
-      subagent_type?: AgentType;
-      source?: 'registry' | 'private' | 'all';
-    };
-
-    const offset = query.cursor ? parseInt(query.cursor, 10) : 0;
-    const limit = query.limit ?? 50;
-
-    const result = databaseService.queryAgents({
-      search: query.search,
-      source: query.source,
-      category: query.category,
-      tags: query.tags,
-      verified: query.verified,
-      featured: query.featured,
-      subagentType: query.subagent_type,
-      limit,
-      offset,
-    });
-
-    const nextOffset = offset + result.agents.length;
-    const hasMore = nextOffset < result.total;
-
-    res.json({
-      agents: result.agents,
-      metadata: {
-        count: result.agents.length,
-        total: result.total,
-        nextCursor: hasMore ? nextOffset.toString() : undefined,
-      },
-    });
-    return;
-  }
-);
-
-/**
- * GET /v0.1/agents/:agentName/versions
- * List all versions of an agent
- */
-router.get('/agents/:agentName/versions', (req: Request, res: Response) => {
-  const agentName = decodeURIComponent(req.params.agentName as string);
-  const versions = databaseService.getAgentVersions(agentName);
-
-  if (versions.length === 0) {
-    res.status(404).json({ error: 'Agent not found' });
-    return;
-  }
-
-  res.json({
-    agents: versions,
-    metadata: { count: versions.length },
-  });
-  return;
-});
-
-/**
- * GET /v0.1/agents/:agentName/versions/:version
- * Get specific version of an agent
- */
-router.get('/agents/:agentName/versions/:version', (req: Request, res: Response) => {
-  const agentName = decodeURIComponent(req.params.agentName as string);
-  const version = decodeURIComponent(req.params.version as string);
-
-  let agent: ReturnType<typeof databaseService.getAgent>;
-  if (version === 'latest') {
-    agent = databaseService.getLatestAgent(agentName);
-  } else {
-    agent = databaseService.getAgent(agentName, version);
-  }
-
-  if (!agent) {
-    res.status(404).json({ error: 'Agent not found' });
-    return;
-  }
-
-  res.json(agent);
   return;
 });
 

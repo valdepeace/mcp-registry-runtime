@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Private MCP (Model Context Protocol) server registry monorepo. Syncs with the official MCP registry, supports adding private servers, and manages runtime MCP server processes via PM2. Two apps: Express.js backend API + SvelteKit frontend dashboard.
+Private MCP (Model Context Protocol) server registry monorepo. Syncs with the official MCP registry, supports adding private servers, and manages runtime MCP server processes via PM2. Three apps: registry API, runtime API, and a SvelteKit dashboard, plus a shared types package.
 
 ## Commands
 
@@ -12,20 +12,22 @@ Private MCP (Model Context Protocol) server registry monorepo. Syncs with the of
 # Install all dependencies
 npm install
 
-# Development (both apps)
+# Development (all apps)
 npm run dev
 
 # Individual apps
-npm run dev:backend          # Backend on :3000 (tsx watch)
-npm run dev:frontend         # Frontend on :5173 (Vite HMR, proxies to backend)
+npm run dev:registry         # Registry on :3000 (tsx watch)
+npm run dev:runtime          # Runtime on :3001 (tsx watch)
+npm run dev:frontend         # Frontend on :5173 (Vite HMR, proxies to both backends)
 
 # Build
 npm run build                # Build all workspaces
 npm run typecheck            # Type check all workspaces
 
-# Workspace-specific
-npm run build -w @mcp/backend
-npm run build -w @mcp/frontend
+# Workspace-specific (nx)
+npm run build:registry
+npm run build:runtime
+npm run build:frontend
 
 # Frontend-specific checks
 cd apps/frontend && npm run check    # svelte-check + TypeScript
@@ -38,13 +40,18 @@ No test framework is configured yet.
 
 ## Architecture
 
-**Monorepo** using npm workspaces (`apps/backend`, `apps/frontend`).
+**Monorepo** using npm workspaces + nx (`apps/registry`, `apps/runtime`, `apps/frontend`, `packages/types`).
 
-### Backend (`apps/backend`) - Express.js + TypeScript (ESM)
+### Registry (`apps/registry`, :3000) - Express.js + TypeScript (ESM)
 
 - **Entry**: `src/index.ts` - Express app bootstrap, graceful shutdown
-- **Routes**: `src/routes/` - public (`/v0.1/*`), admin (`/admin/*`), runtime (`/admin/runtime/*`)
-- **Services**: `src/services/` - database (SQLite via better-sqlite3), sync, official-registry, PM2, runtime, event-bus (EventEmitter for SSE streaming)
+- **Routes**: `src/routes/` - public (`/v0.1/*`), admin (`/admin/*`)
+- **Services**: `src/services/` - database (SQLite via better-sqlite3), sync, official-registry, skills-registry, `providers/` (skills.sh, Smithery, Vercel Labs), sync-event-bus (SSE)
+
+### Runtime (`apps/runtime`, :3001) - Express.js + TypeScript (ESM)
+
+- **Routes**: `src/routes/runtime.routes.ts` mounted at `/admin/runtime`
+- **Services**: PM2 (via CLI), runtime, mcp-inspector, git (clone MCP server repos), event-bus (EventEmitter for SSE streaming)
 - **Middleware**: JWT auth (`auth.middleware.ts`), Zod validation (`validation.middleware.ts`)
 - **Models**: `src/models/` - Zod schemas for request validation
 - **Types**: `src/types/` - TypeScript interfaces
@@ -92,10 +99,10 @@ Services are exported as singletons (class instance, not class). Database is SQL
 
 ## Configuration
 
-Backend configured via `.env` file (see `apps/backend/.env.example`). Key variables: `PORT`, `DB_PATH`, `JWT_SECRET`, `ADMIN_USERNAME`/`ADMIN_PASSWORD`, `SYNC_INTERVAL_MS`, `SYNC_ON_STARTUP`.
+Each backend is configured via its own `.env` file (see `apps/registry/.env.example`, `apps/runtime/.env.example`). Key variables: `PORT`, `DB_PATH`, `JWT_SECRET`, `ADMIN_USERNAME`/`ADMIN_PASSWORD`, `SYNC_INTERVAL_MS`, `SYNC_ON_STARTUP`.
 
 Default admin credentials: `admin` / `admin`.
 
 ## Docker
 
-`docker-compose.yml` runs both services. Note: better-sqlite3 is a native module requiring rebuild in containers (Node 22-alpine).
+`docker-compose.yml` runs registry, runtime and frontend. Note: better-sqlite3 is a native module requiring rebuild in containers (Node 22-alpine).

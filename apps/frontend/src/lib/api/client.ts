@@ -1,8 +1,4 @@
 import type {
-  OllamaStatus,
-  OllamaModel,
-  OllamaRunningModel,
-  OllamaPullEvent,
   ServerListResponse,
   ServerResponse,
   ListServersParams,
@@ -24,17 +20,7 @@ import type {
   SkillListResponse,
   SkillResponse,
   SkillListParams,
-  AgentListResponse,
-  AgentResponse,
-  AgentListParams,
-  AgentInstanceListResponse,
-  AgentInstanceResponse,
-  AgentComposeResponse,
-  AgentInvokeResponse,
-  AgentInvocation,
-  AgentRuntimeHealth,
   SkillDetail,
-  AgentDetail,
 } from '$lib/types';
 
 const API_BASE = '';
@@ -433,119 +419,13 @@ class ApiClient {
     return this.request(`/admin/skills/${encodedName}`, { method: 'DELETE' });
   }
 
-  // ── Agents API ────────────────────────────────────────────────────────
-
-  async listAgents(params: AgentListParams = {}): Promise<AgentListResponse> {
-    const searchParams = new URLSearchParams();
-    if (params.cursor) searchParams.set('cursor', params.cursor);
-    if (params.limit) searchParams.set('limit', params.limit.toString());
-    if (params.search) searchParams.set('search', params.search);
-    if (params.category) searchParams.set('category', params.category);
-    if (params.tags) searchParams.set('tags', params.tags);
-    if (params.verified != null) searchParams.set('verified', String(params.verified));
-    if (params.featured != null) searchParams.set('featured', String(params.featured));
-    if (params.subagent_type) searchParams.set('subagent_type', params.subagent_type);
-    if (params.source) searchParams.set('source', params.source);
-    const query = searchParams.toString();
-    return this.request<AgentListResponse>(`/v0.1/agents${query ? `?${query}` : ''}`);
-  }
-
-  async getAgentVersions(agentName: string): Promise<AgentListResponse> {
-    const encoded = encodeURIComponent(agentName);
-    return this.request<AgentListResponse>(`/v0.1/agents/${encoded}/versions`);
-  }
-
-  async getAgentVersion(agentName: string, version: string): Promise<AgentResponse> {
-    const encodedName = encodeURIComponent(agentName);
-    const encodedVersion = encodeURIComponent(version);
-    return this.request<AgentResponse>(`/v0.1/agents/${encodedName}/versions/${encodedVersion}`);
-  }
-
-  async createAgent(agent: AgentDetail): Promise<AgentResponse> {
-    return this.request<AgentResponse>('/admin/agents', {
-      method: 'POST',
-      body: JSON.stringify(agent),
-    });
-  }
-
-  async updateAgent(agentName: string, version: string, updates: Partial<AgentDetail>): Promise<AgentResponse> {
-    const encodedName = encodeURIComponent(agentName);
-    const encodedVersion = encodeURIComponent(version);
-    return this.request<AgentResponse>(
-      `/admin/agents/${encodedName}/versions/${encodedVersion}`,
-      { method: 'PUT', body: JSON.stringify(updates) }
-    );
-  }
-
-  async deleteAgentVersion(agentName: string, version: string): Promise<{ message: string }> {
-    const encodedName = encodeURIComponent(agentName);
-    const encodedVersion = encodeURIComponent(version);
-    return this.request(`/admin/agents/${encodedName}/versions/${encodedVersion}`, { method: 'DELETE' });
-  }
-
-  async deleteAgent(agentName: string): Promise<{ message: string }> {
-    const encodedName = encodeURIComponent(agentName);
-    return this.request(`/admin/agents/${encodedName}`, { method: 'DELETE' });
-  }
-
-  // ── Agent Runtime API ─────────────────────────────────────────────────
-
-  async listAgentInstances(): Promise<AgentInstanceListResponse> {
-    return this.request<AgentInstanceListResponse>('/admin/agent-runtime/instances');
-  }
-
-  async getAgentRuntimeHealth(): Promise<AgentRuntimeHealth> {
-    return this.request<AgentRuntimeHealth>('/admin/agent-runtime/health');
-  }
-
-  async createAgentInstance(data: { agent_name: string; agent_version: string; auto_start?: boolean; env_json?: Record<string, string> }): Promise<AgentInstanceResponse> {
-    return this.request<AgentInstanceResponse>('/admin/agent-runtime/instances', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
-  }
-
-  async getAgentInstance(id: string): Promise<AgentInstanceResponse> {
-    return this.request<AgentInstanceResponse>(`/admin/agent-runtime/instances/${id}`);
-  }
-
-  async deleteAgentInstance(id: string): Promise<{ message: string }> {
-    return this.request(`/admin/agent-runtime/instances/${id}`, { method: 'DELETE' });
-  }
-
-  async startAgentInstance(id: string): Promise<AgentInstanceResponse> {
-    return this.request<AgentInstanceResponse>(`/admin/agent-runtime/instances/${id}/start`, { method: 'POST' });
-  }
-
-  async stopAgentInstance(id: string): Promise<AgentInstanceResponse> {
-    return this.request<AgentInstanceResponse>(`/admin/agent-runtime/instances/${id}/stop`, { method: 'POST' });
-  }
-
-  async invokeAgent(id: string, input: string): Promise<AgentInvokeResponse> {
-    return this.request<AgentInvokeResponse>(`/admin/agent-runtime/instances/${id}/invoke`, {
-      method: 'POST',
-      body: JSON.stringify({ input }),
-    });
-  }
-
-  async getAgentInvocations(id: string): Promise<{ invocations: AgentInvocation[] }> {
-    return this.request<{ invocations: AgentInvocation[] }>(`/admin/agent-runtime/instances/${id}/invocations`);
-  }
-
-  async composeAgent(agentName: string, agentVersion: string): Promise<AgentComposeResponse> {
-    return this.request<AgentComposeResponse>('/admin/agent-runtime/compose', {
-      method: 'POST',
-      body: JSON.stringify({ agent_name: agentName, agent_version: agentVersion }),
-    });
-  }
-
   // ── Sync & Providers API ──────────────────────────────────────────
 
   async getSyncProviders(): Promise<{ providers: Array<{ providerName: string; entityType: string; entityCount: number; lastSync: string | null; lastStatus: string; lastError: string | null; configured: boolean }> }> {
     return this.request('/admin/sync/providers');
   }
 
-  async triggerSyncByType(type: 'servers' | 'skills' | 'agents'): Promise<{ message: string }> {
+  async triggerSyncByType(type: 'servers' | 'skills'): Promise<{ message: string }> {
     return this.request(`/admin/sync/trigger/${type}`, { method: 'POST' });
   }
 
@@ -569,72 +449,7 @@ class ApiClient {
     });
   }
 
-  async cloneAgent(name: string, version: string): Promise<{ agent: AgentResponse; message?: string }> {
-    return this.request('/admin/agents/clone', {
-      method: 'POST',
-      body: JSON.stringify({ name, version }),
-    });
-  }
 
-  // ── Ollama API ────────────────────────────────────────────────────
-
-  async getOllamaStatus(): Promise<OllamaStatus> {
-    return this.request<OllamaStatus>('/admin/ollama/status');
-  }
-
-  async listOllamaModels(): Promise<{ models: OllamaModel[] }> {
-    return this.request<{ models: OllamaModel[] }>('/admin/ollama/models');
-  }
-
-  async listOllamaRunning(): Promise<{ models: OllamaRunningModel[] }> {
-    return this.request<{ models: OllamaRunningModel[] }>('/admin/ollama/ps');
-  }
-
-  async deleteOllamaModel(name: string): Promise<{ message: string }> {
-    return this.request<{ message: string }>(`/admin/ollama/models/${encodeURIComponent(name)}`, {
-      method: 'DELETE',
-    });
-  }
-
-  async *pullOllamaModel(model: string): AsyncGenerator<OllamaPullEvent> {
-    const token = this.token;
-    const response = await fetch('/admin/ollama/pull', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      },
-      body: JSON.stringify({ model }),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      yield { type: 'error', error: text || `HTTP ${response.status}` };
-      return;
-    }
-
-    const reader = response.body!.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          try {
-            yield JSON.parse(line.slice(6)) as OllamaPullEvent;
-          } catch { /* skip malformed */ }
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
-  }
 }
 
 export const api = new ApiClient();

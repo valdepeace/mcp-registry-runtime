@@ -25,3 +25,8 @@ registry-proc.xml
 
 .nx/cache
 .nx/workspace-data
+
+# Editor / AI tooling (local only)
+.vscode/
+.crush/
+.serena/
