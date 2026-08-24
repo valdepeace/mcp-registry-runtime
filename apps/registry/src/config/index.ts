@@ -1,7 +1,21 @@
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { z } from 'zod';
 
 dotenv.config();
+
+// The DB should live in a fixed, discoverable place on disk — not wherever
+// the process happened to be launched from (nx, pm2, a plain `node
+// dist/index.js`, ...) and not some hidden OS temp dir. Default it next to
+// the monorepo clone itself: apps/registry/{src,dist}/config -> up 4 is the
+// repo root, and its parent is the workspace folder every dev already has
+// (the folder they ran `git clone` in), so the whole team finds the DB in
+// the same place with zero config.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(__dirname, '../../../..');
+const WORKSPACE_ROOT = path.dirname(REPO_ROOT);
+const DEFAULT_DB_PATH = path.join(WORKSPACE_ROOT, 'mcp-registry-runtime-data', 'registry.db');
 
 const ConfigSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3000),
@@ -14,7 +28,7 @@ const ConfigSchema = z.object({
   SMITHERY_API_URL: z.string().url().optional(),
   SMITHERY_SKILLS_MAX: z.coerce.number().int().min(0).optional(),
   SYNC_INTERVAL_MS: z.coerce.number().int().min(0).default(300_000),
-  DB_PATH: z.string().min(1).default('./data/registry.db'),
+  DB_PATH: z.string().min(1).default(DEFAULT_DB_PATH),
   JWT_SECRET: z.string().min(1).default('change-me-in-production'),
   JWT_EXPIRES_IN: z.string().min(1).default('24h'),
   ADMIN_USERNAME: z.string().min(1).default('admin'),
