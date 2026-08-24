@@ -1,7 +1,14 @@
 import dotenv from 'dotenv';
+import os from 'os';
+import path from 'path';
 import { z } from 'zod';
 
 dotenv.config();
+
+// Cloned MCP repos live under the user's home dir by default, not the cwd the
+// process happened to be started from — so the same path is found regardless
+// of where `npm run dev:runtime` was launched.
+const DEFAULT_REPOS_DIR = path.join(os.homedir(), '.registry-mcp-runtime', 'repos');
 
 const ConfigSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3001),
@@ -16,7 +23,7 @@ const ConfigSchema = z.object({
     })
     .default('*'),
   REGISTRY_URL: z.string().url().default('http://localhost:3000'),
-  REPOS_DIR: z.string().min(1).default('./data/repos'),
+  REPOS_DIR: z.string().min(1).default(DEFAULT_REPOS_DIR),
 });
 
 const parseResult = ConfigSchema.safeParse(process.env);

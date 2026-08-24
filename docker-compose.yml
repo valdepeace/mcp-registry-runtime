@@ -46,6 +46,7 @@ services:
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
       - REGISTRY_URL=http://registry:3000
+      - REPOS_DIR=/app/data/repos
     volumes:
       - runtime-data:/app/data
     restart: unless-stopped
