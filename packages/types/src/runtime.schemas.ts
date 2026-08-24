@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const RuntimeStatusEnum = z.enum(['stopped', 'starting', 'online', 'stopping', 'errored', 'degraded']);
+export const RuntimeStatusEnum = z.enum(['provisioning', 'stopped', 'starting', 'online', 'stopping', 'errored', 'degraded']);
 
 export const CreateRuntimeInstanceSchema = z.object({
   server_name: z.string()

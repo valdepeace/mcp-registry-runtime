@@ -35,9 +35,9 @@
     loading = true;
     try {
       const response = await api.listServers({ search: searchQuery, limit: 50 });
-      // Transform ServerResponse to ServerListItem, filter only servers with packages
+      // Anything we can actually run here: a published package, or source to build from
       results = response.servers
-        .filter(s => s.server.packages && s.server.packages.length > 0)
+        .filter(s => (s.server.packages?.length ?? 0) > 0 || !!s.server.repository?.url)
         .slice(0, 20)
         .map(s => ({
           name: s.server.name,

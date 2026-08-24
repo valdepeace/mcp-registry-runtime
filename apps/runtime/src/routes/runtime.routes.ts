@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { runtimeService, databaseService, runtimeEventBus, mcpInspectorService, pm2Service, gitService } from '../services/index.js';
+import { runtimeService, databaseService, runtimeEventBus, mcpInspectorService, pm2Service, provisionService, PENDING_PROVISION } from '../services/index.js';
 import type { RuntimeEventName } from '../services/index.js';
 import { validateBody, validateQuery } from '../middleware/index.js';
 import {
@@ -8,47 +8,10 @@ import {
   LogsQuerySchema
 } from '@mcp/types';
 import type { ServerResponse } from '@mcp/types';
+import { buildArgs, resolveLocalPort, type ArgSpec } from '../services/catalog-args.js';
 import { config } from '../config/index.js';
-import fs from 'fs';
-import path from 'path';
 
 const router = Router();
-
-interface DetectedCommand {
-  execCmd: string;
-  execArgs: string[];
-}
-
-function detectFromProject(projectDir: string): DetectedCommand | null {
-  const packageJsonPath = path.join(projectDir, 'package.json');
-
-  if (fs.existsSync(packageJsonPath)) {
-    try {
-      const pkg = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
-      if (pkg.scripts?.start) {
-        return { execCmd: 'npm', execArgs: ['start'] };
-      }
-      if (pkg.main) {
-        return { execCmd: 'node', execArgs: [pkg.main] };
-      }
-    } catch {
-      // invalid package.json
-    }
-  }
-
-  const pyprojectPath = path.join(projectDir, 'pyproject.toml');
-  if (fs.existsSync(pyprojectPath)) {
-    return { execCmd: 'uv', execArgs: ['run', 'server.py'] };
-  }
-
-  const dockerfilePath = path.join(projectDir, 'Dockerfile');
-  if (fs.existsSync(dockerfilePath)) {
-    const imageName = path.basename(projectDir).replace(/[^a-zA-Z0-9._-]/g, '-').toLowerCase();
-    return { execCmd: 'docker', execArgs: ['run', '-i', '--rm', imageName] };
-  }
-
-  return null;
-}
 
 router.get('/events', (req: Request, res: Response) => {
   res.writeHead(200, {
@@ -155,11 +118,12 @@ router.post(
 
 router.post('/instances/from-catalog', async (req: Request, res: Response) => {
   try {
-    const { server_name, version, clone_repo, auto_start } = req.body as {
+    const { server_name, version, clone_repo, auto_start, dry_run } = req.body as {
       server_name: string;
       version?: string;
       clone_repo?: boolean;
       auto_start?: boolean;
+      dry_run?: boolean;
     };
 
     if (!server_name) {
@@ -180,48 +144,57 @@ router.post('/instances/from-catalog', async (req: Request, res: Response) => {
 
     const server = await registryResponse.json() as ServerResponse;
 
-    let cwd: string | undefined;
-
-    if (clone_repo && server.server.repository?.url) {
-      const targetDir = await gitService.cloneRepo(server.server.repository.url, server.server.name);
-      cwd = targetDir;
-    }
+    const cwd: string | undefined = undefined;
+    const repoUrl = server.server.repository?.url;
+    // Plenty of MCPs live in a subdirectory of a monorepo.
+    const subfolder = server.server.repository?.subfolder;
 
     let exec_cmd: string;
     let exec_args: string[] = [];
     let env_json: Record<string, string> = {};
+    let port: number | undefined;
 
     const pkg = server.server.packages?.[0];
+    // clone_repo means "build it from source", so it wins over the published package
+    const buildFromSource = !!repoUrl && (!pkg || !!clone_repo);
 
-    if (pkg) {
-      // Auto-detect from package definition (existing logic)
+    if (pkg && !buildFromSource) {
       const registryType = pkg.registryType.toLowerCase();
       const runtimeHint = pkg.runtimeHint?.toLowerCase() || '';
+      const runtimeArgs = buildArgs(pkg.runtimeArguments as ArgSpec[] | undefined);
+      const packageArgs = buildArgs(pkg.packageArguments as ArgSpec[] | undefined);
+
+      // MCPs that speak HTTP run locally and listen on a port — nothing is sent
+      // to the vendor's hosted endpoint.
+      const transportType = pkg.transport?.type;
+      if (transportType === 'streamable-http' || transportType === 'sse') {
+        const taken = new Set(
+          runtimeService.listInstances().map(i => i.port).filter((p): p is number => !!p)
+        );
+        port = resolveLocalPort(
+          [
+            ...((pkg.runtimeArguments ?? []) as ArgSpec[]),
+            ...((pkg.packageArguments ?? []) as ArgSpec[]),
+          ],
+          taken,
+        );
+      }
 
       if (registryType === 'npm') {
         exec_cmd = runtimeHint || 'npx';
-        exec_args = [pkg.identifier];
+        exec_args = [...runtimeArgs, pkg.identifier, ...packageArgs];
       } else if (registryType === 'pypi') {
         exec_cmd = runtimeHint || 'uvx';
-        exec_args = [pkg.identifier];
+        exec_args = [...runtimeArgs, pkg.identifier, ...packageArgs];
       } else if (registryType === 'oci' || registryType === 'docker') {
+        // runtime args are docker's own flags, they go before the image
         exec_cmd = 'docker';
-        exec_args = ['run', '-i', '--rm', pkg.identifier];
+        exec_args = ['run', '-i', '--rm', ...runtimeArgs, pkg.identifier, ...packageArgs];
       } else {
         res.status(400).json({
           error: `Unsupported registry type: ${registryType}. Please create instance manually.`
         });
         return;
-      }
-
-      if (pkg.packageArguments) {
-        for (const arg of pkg.packageArguments) {
-          if (arg.type === 'positional' && 'valueHint' in arg && arg.valueHint) {
-            exec_args.push(arg.valueHint);
-          } else if (arg.type === 'named' && 'name' in arg && arg.name) {
-            exec_args.push(arg.name as string);
-          }
-        }
       }
 
       if (pkg.environmentVariables) {
@@ -231,20 +204,51 @@ router.post('/instances/from-catalog', async (req: Request, res: Response) => {
           }
         }
       }
-    } else if (clone_repo && cwd) {
-      // No packages — try to auto-detect from cloned project files
-      const detected = detectFromProject(cwd);
-      if (!detected) {
-        res.status(400).json({
-          error: 'Could not auto-detect runtime from cloned project. Create instance manually with the correct exec command.',
-          cwd
+    } else if (buildFromSource && repoUrl) {
+      // Build from source, but there is source: clone it, install its
+      // dependencies and build it here, then let PM2 run the result. The code
+      // executes on this machine and stays on disk, so it can be audited.
+      if (dry_run) {
+        res.json({
+          detected: {
+            exec_cmd: '',
+            exec_args: [],
+            env_json: {},
+            port,
+            provision: { repository: repoUrl, subfolder },
+          },
         });
         return;
       }
-      exec_cmd = detected.execCmd;
-      exec_args = detected.execArgs;
+
+      const instance = runtimeService.createInstance(
+        {
+          server_name: server.server.name,
+          version: server.server.version,
+          exec_cmd: PENDING_PROVISION,
+          port,
+        } as any,
+        'provisioning',
+      );
+
+      // Minutes of work — do not hold the request open for it.
+      void provisionService
+        .provision(instance.id, repoUrl, server.server.name, port, subfolder)
+        .then(async () => {
+          if (!auto_start) return;
+          const ready = runtimeService.getInstance(instance.id);
+          if (ready?.status === 'stopped') await runtimeService.startInstance(instance.id);
+        });
+
+      res.status(202).json({
+        instance,
+        message: 'Cloning the repository and installing dependencies. Watch the instance for progress.',
+      });
+      return;
     } else {
-      res.status(400).json({ error: 'Server has no packages defined, cannot auto-detect runtime' });
+      res.status(400).json({
+        error: 'This MCP has no package and no repository, so there is nothing to run locally',
+      });
       return;
     }
 
@@ -259,6 +263,15 @@ router.post('/instances/from-catalog', async (req: Request, res: Response) => {
     if (cwd) {
       input.cwd = cwd;
     }
+    if (port) {
+      input.port = port;
+    }
+
+    // dry_run lets the UI show the detected config for review before creating.
+    if (dry_run) {
+      res.json({ detected: { exec_cmd, exec_args, env_json, cwd, port } });
+      return;
+    }
 
     const instance = runtimeService.createInstance(input as any);
 
@@ -272,7 +285,7 @@ router.post('/instances/from-catalog', async (req: Request, res: Response) => {
 
       res.status(201).json({
         instance: updated,
-        detected: { exec_cmd, exec_args, env_json, cwd },
+        detected: { exec_cmd, exec_args, env_json, cwd, port },
         message: cwd
           ? 'Repo cloned, instance created and started.'
           : 'Instance created and started.',
@@ -282,7 +295,7 @@ router.post('/instances/from-catalog', async (req: Request, res: Response) => {
 
     res.status(201).json({
       instance,
-      detected: { exec_cmd, exec_args, env_json, cwd },
+      detected: { exec_cmd, exec_args, env_json, cwd, port },
       message: cwd
         ? 'Repo cloned, instance created. Review settings before starting.'
         : 'Instance created from catalog. Review and adjust settings before starting.'

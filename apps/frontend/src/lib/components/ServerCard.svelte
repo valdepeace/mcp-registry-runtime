@@ -2,6 +2,7 @@
   import type { ServerResponse, RegistryMeta, PrivateMeta } from '$lib/types';
   import { REGISTRY_META_NAMESPACE } from '$lib/types';
   import { api } from '$lib/api/client';
+  import { isAuthenticated } from '$lib/stores/auth';
   import Chip from './Chip.svelte';
   import LaunchModal from './LaunchModal.svelte';
 
@@ -108,6 +109,12 @@
   );
 
   const hasPackages = $derived((server.server.packages?.length ?? 0) > 0);
+  // An HTTP MCP still runs locally — the package is installed here and listens
+  // on a local port. Nothing is sent to the vendor's hosted endpoint.
+  const runsHttp = $derived(
+    server.server.packages?.some(p => p.transport?.type === 'streamable-http' || p.transport?.type === 'sse') ?? false
+  );
+  // Remote-only entries have no package and no repo: there is nothing to run here.
   const canLaunch = $derived(hasPackages || !!server.server.repository?.url);
 
   const inferredLang = $derived(
@@ -149,14 +156,14 @@
         <span class="text-xs text-gray-500 font-medium whitespace-nowrap">
           v{server.server.version}
         </span>
-        {#if canLaunch}
+        {#if canLaunch && $isAuthenticated}
           <button
             type="button"
             onclick={(e) => { e.stopPropagation(); launchOpen = true; }}
             class="text-xs px-2 py-1 rounded font-medium bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors"
-            title="Launch this MCP"
+            title={runsHttp ? 'Run this MCP locally over HTTP and create its runtime instance' : 'Create and start a runtime instance for this MCP'}
           >
-            Launch
+            Runtime
           </button>
         {/if}
       </div>

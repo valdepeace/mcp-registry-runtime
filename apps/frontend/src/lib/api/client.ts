@@ -9,6 +9,7 @@ import type {
   RuntimeListResponse,
   RuntimeMetricsResponse,
   RuntimeInstanceResponse,
+  DetectedRuntimeConfig,
   RuntimeLogsResponse,
   CreateRuntimeInstanceInput,
   UpdateRuntimeInstanceInput,
@@ -314,10 +315,18 @@ class ApiClient {
     });
   }
 
-  async createRuntimeFromCatalog(serverName: string, version?: string, cloneRepo?: boolean, autoStart?: boolean): Promise<RuntimeInstanceResponse & { detected: any; message?: string }> {
+  async createRuntimeFromCatalog(serverName: string, version?: string, cloneRepo?: boolean, autoStart?: boolean): Promise<RuntimeInstanceResponse & { detected: DetectedRuntimeConfig; message?: string }> {
     return this.request('/admin/runtime/instances/from-catalog', {
       method: 'POST',
       body: JSON.stringify({ server_name: serverName, version, clone_repo: cloneRepo ?? false, auto_start: autoStart ?? false })
+    });
+  }
+
+  /** Same detection as createRuntimeFromCatalog, but returns the config instead of creating it. */
+  async previewRuntimeFromCatalog(serverName: string, version?: string): Promise<{ detected: DetectedRuntimeConfig }> {
+    return this.request('/admin/runtime/instances/from-catalog', {
+      method: 'POST',
+      body: JSON.stringify({ server_name: serverName, version, dry_run: true })
     });
   }
 

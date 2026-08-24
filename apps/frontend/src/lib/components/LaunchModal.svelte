@@ -1,7 +1,7 @@
 <script lang="ts">
   import { api } from '$lib/api/client';
   import { goto } from '$app/navigation';
-  import type { ServerResponse } from '$lib/types';
+  import type { ServerResponse, DetectedRuntimeConfig } from '$lib/types';
 
   interface Props {
     open: boolean;
@@ -19,6 +19,19 @@
   let launching = $state(false);
   let error = $state<string | null>(null);
   let result = $state<Record<string, any> | null>(null);
+  let preview = $state<DetectedRuntimeConfig | null>(null);
+  let previewError = $state<string | null>(null);
+
+  // Show what will actually run before anything is created.
+  $effect(() => {
+    if (!open || result) return;
+    preview = null;
+    previewError = null;
+    api
+      .previewRuntimeFromCatalog(server.server.name, server.server.version)
+      .then(r => (preview = r.detected))
+      .catch(e => (previewError = e instanceof Error ? e.message : 'Could not detect runtime'));
+  });
 
   async function handleLaunch() {
     error = null;
@@ -86,6 +99,23 @@
                 <span class="font-medium text-gray-700">Repository:</span>
                 <a href={repoUrl} target="_blank" rel="noopener" class="text-blue-600 hover:underline ml-1 break-all">{repoUrl}</a>
               </div>
+            {/if}
+            {#if preview}
+              <div>
+                <span class="font-medium text-gray-700">Command:</span>
+                <code class="ml-1 text-xs break-all">{preview.exec_cmd} {preview.exec_args?.join(' ') ?? ''}</code>
+              </div>
+              {#if preview.port}
+                <div>
+                  <span class="font-medium text-gray-700">Local port:</span>
+                  <span class="ml-1">{preview.port}</span>
+                  <span class="text-xs text-gray-500 block mt-0.5">
+                    Speaks HTTP — runs on this machine at http://127.0.0.1:{preview.port}, nothing leaves the host.
+                  </span>
+                </div>
+              {/if}
+            {:else if previewError}
+              <div class="text-xs text-gray-500">Runtime could not be auto-detected: {previewError}</div>
             {/if}
           </div>
 

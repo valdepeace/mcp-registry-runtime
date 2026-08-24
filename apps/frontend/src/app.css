@@ -1,1 +1,62 @@
 @import "tailwindcss";
+
+/*
+ * ponytail: dark mode by swapping Tailwind's own color tokens under .dark,
+ * instead of adding dark: variants to every component. The utilities already
+ * compile to var(--color-*), so redefining the ramp flips the whole app.
+ * Ceiling: any color written as a literal hex in a component won't follow —
+ * move it to a Tailwind class if that shows up.
+ */
+.dark {
+  color-scheme: dark;
+
+  --color-white: #0d1117;
+  --color-black: #f0f6fc;
+
+  --color-gray-50: #10151c;
+  --color-gray-100: #161b22;
+  --color-gray-200: #21262d;
+  --color-gray-300: #30363d;
+  --color-gray-400: #6e7681;
+  --color-gray-500: #8b949e;
+  --color-gray-600: #a8b1bb;
+  --color-gray-700: #c9d1d9;
+  --color-gray-800: #e2e8ef;
+  --color-gray-900: #f0f6fc;
+
+  --color-blue-50: #0d1f33;
+  --color-blue-100: #12283f;
+  --color-blue-200: #1b3a5c;
+  --color-blue-300: #2f5c8a;
+  --color-blue-600: #6cb2ff;
+  --color-blue-700: #93c5fd;
+  --color-blue-800: #bfdbfe;
+
+  --color-green-50: #0d2318;
+  --color-green-100: #10301f;
+  --color-green-600: #4ade80;
+  --color-green-700: #86efac;
+
+  --color-red-50: #2a1113;
+  --color-red-100: #3a1518;
+  --color-red-200: #5a1f24;
+  --color-red-300: #7f2a30;
+  --color-red-600: #f87171;
+  --color-red-700: #fca5a5;
+  --color-red-800: #fecaca;
+
+  --color-yellow-100: #322a0c;
+  --color-yellow-600: #fcd34d;
+  --color-yellow-700: #fde68a;
+
+  --color-orange-100: #33220c;
+  --color-orange-600: #fdba74;
+  --color-orange-700: #fed7aa;
+
+  --color-purple-50: #1d1030;
+  --color-purple-100: #271640;
+  --color-purple-700: #d8b4fe;
+
+  --color-cyan-100: #0c2a2f;
+  --color-cyan-700: #a5f3fc;
+}

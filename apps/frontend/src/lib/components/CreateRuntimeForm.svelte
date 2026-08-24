@@ -1,40 +1,107 @@
 <script lang="ts">
-  import type { CreateRuntimeInstanceInput } from '$lib/types';
+  import { api } from '$lib/api/client';
+  import ServerCombobox from './ServerCombobox.svelte';
+  import type { CreateRuntimeInstanceInput, ServerListItem } from '$lib/types';
 
   interface Props {
-    onSubmit: (input: CreateRuntimeInstanceInput) => void;
+    onSubmit: (input: CreateRuntimeInstanceInput, opts?: { buildFromSource?: boolean }) => void;
     onCancel: () => void;
     loading?: boolean;
+    /** Preselected MCP, e.g. when opened from a catalog card. */
+    initialServerName?: string;
+    initialVersion?: string;
   }
 
-  let { onSubmit, onCancel, loading = false }: Props = $props();
+  let {
+    onSubmit,
+    onCancel,
+    loading = false,
+    initialServerName = '',
+    initialVersion = '',
+  }: Props = $props();
 
-  let serverName = $state('');
-  let version = $state('');
+  let serverName = $state(initialServerName);
+  let version = $state(initialVersion);
   let execCmd = $state('');
   let execArgs = $state('');
   let cwd = $state('');
   let port = $state('');
   let envJson = $state('');
 
+  let selectedServer = $state<ServerListItem | null>(null);
+  /** Set when the MCP ships no package and has to be cloned and built here. */
+  let sourceRepo = $state<string | null>(null);
+  let detecting = $state(false);
+  let detectNote = $state<string | null>(null);
   let error = $state<string | null>(null);
+
+  /**
+   * Ask the runtime to work out exec_cmd/args/env/port for this MCP without
+   * creating anything, then drop the answer into the fields so it stays editable.
+   */
+  async function detect(name: string, ver?: string) {
+    if (!name) return;
+    detecting = true;
+    detectNote = null;
+    error = null;
+    try {
+      const { detected } = await api.previewRuntimeFromCatalog(name, ver || undefined);
+      sourceRepo = detected.provision?.repository ?? null;
+      execCmd = detected.exec_cmd ?? '';
+      execArgs = (detected.exec_args ?? []).join(' ');
+      cwd = detected.cwd ?? '';
+      port = detected.port ? String(detected.port) : '';
+      envJson = Object.keys(detected.env_json ?? {}).length
+        ? JSON.stringify(detected.env_json, null, 2)
+        : '';
+      if (sourceRepo) {
+        detectNote = null;
+      } else {
+        detectNote = port
+          ? `Detected from catalog. This MCP speaks HTTP — it will run locally on port ${port}.`
+          : 'Detected from catalog. Review before creating.';
+      }
+    } catch (e) {
+      sourceRepo = null;
+      detectNote = e instanceof Error
+        ? `Could not auto-detect: ${e.message}. Fill the command in by hand.`
+        : 'Could not auto-detect. Fill the command in by hand.';
+    } finally {
+      detecting = false;
+    }
+  }
+
+  function handleServerSelect(server: ServerListItem | null) {
+    selectedServer = server;
+    sourceRepo = null;
+    if (!server) return;
+    version = server.version;
+    detect(server.name, server.version);
+  }
+
+  // Preselected from a catalog card — detect straight away.
+  $effect(() => {
+    if (initialServerName) detect(initialServerName, initialVersion);
+  });
 
   function handleSubmit(e: Event) {
     e.preventDefault();
     error = null;
 
-    if (!serverName || !version || !execCmd) {
-      error = 'Server name, version, and command are required';
+    if (!serverName || !version) {
+      error = 'MCP and version are required';
+      return;
+    }
+    if (!sourceRepo && !execCmd) {
+      error = 'Command is required';
       return;
     }
 
-    // Validate server name format
     if (!/^[a-zA-Z0-9.-]+\/[a-zA-Z0-9._-]+$/.test(serverName)) {
-      error = 'Server name must be in format org/name';
+      error = 'MCP name must be in format org/name';
       return;
     }
 
-    // Parse env JSON if provided
     let parsedEnv: Record<string, string> | undefined;
     if (envJson.trim()) {
       try {
@@ -45,22 +112,18 @@
       }
     }
 
-    // Parse args
-    const parsedArgs = execArgs.trim() 
-      ? execArgs.split(/\s+/).filter(Boolean) 
-      : undefined;
-
-    const input: CreateRuntimeInstanceInput = {
-      server_name: serverName,
-      version,
-      exec_cmd: execCmd,
-      exec_args: parsedArgs,
-      cwd: cwd || undefined,
-      port: port ? parseInt(port, 10) : undefined,
-      env_json: parsedEnv,
-    };
-
-    onSubmit(input);
+    onSubmit(
+      {
+        server_name: serverName,
+        version,
+        exec_cmd: execCmd,
+        exec_args: execArgs.trim() ? execArgs.split(/\s+/).filter(Boolean) : undefined,
+        cwd: cwd || undefined,
+        port: port ? parseInt(port, 10) : undefined,
+        env_json: parsedEnv,
+      },
+      { buildFromSource: !!sourceRepo },
+    );
   }
 </script>
 
@@ -71,19 +134,20 @@
     </div>
   {/if}
 
-  <div class="grid grid-cols-2 gap-4">
-    <div>
+  <div class="grid grid-cols-3 gap-4">
+    <div class="col-span-2">
       <label for="serverName" class="block text-sm font-medium text-gray-700 mb-1">
-        MCP Name <span class="text-red-500">*</span>
+        MCP <span class="text-red-500">*</span>
       </label>
-      <input
-        id="serverName"
-        type="text"
+      <ServerCombobox
         bind:value={serverName}
-        placeholder="org/server-name"
-        class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        onSelect={handleServerSelect}
+        placeholder="Search the catalog..."
+        disabled={loading}
       />
-      <p class="text-xs text-gray-500 mt-1">Format: org/name (e.g., docker/mcp-docker)</p>
+      <p class="text-xs text-gray-500 mt-1">
+        Pick one and the command is filled in from the catalog. Format: org/name
+      </p>
     </div>
 
     <div>
@@ -100,16 +164,41 @@
     </div>
   </div>
 
+  {#if selectedServer?.description}
+    <div class="p-2 bg-gray-50 rounded text-xs text-gray-600">
+      <div class="font-medium text-gray-800">{selectedServer.name}</div>
+      <div class="line-clamp-2">{selectedServer.description}</div>
+    </div>
+  {/if}
+
+  {#if detecting}
+    <div class="text-xs text-gray-500">Detecting runtime configuration…</div>
+  {:else if sourceRepo}
+    <div class="bg-blue-50 border border-blue-200 text-blue-800 px-3 py-2 rounded text-xs space-y-1">
+      <div>
+        This MCP ships no package. It will be cloned from
+        <a href={sourceRepo} target="_blank" rel="noopener" class="underline break-all">{sourceRepo}</a>,
+        its dependencies installed and the project built here, then PM2 runs it locally.
+      </div>
+      <div>The command is filled in once the build finishes — it can take a few minutes.</div>
+    </div>
+  {:else if detectNote}
+    <div class="bg-blue-50 border border-blue-200 text-blue-800 px-3 py-2 rounded text-xs">
+      {detectNote}
+    </div>
+  {/if}
+
   <div>
     <label for="execCmd" class="block text-sm font-medium text-gray-700 mb-1">
-      Command <span class="text-red-500">*</span>
+      Command {#if !sourceRepo}<span class="text-red-500">*</span>{/if}
     </label>
     <input
       id="execCmd"
       type="text"
       bind:value={execCmd}
-      placeholder="node, python3, uvx, npx..."
-      class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      placeholder={sourceRepo ? 'detected after the build' : 'node, python3, uvx, npx, docker...'}
+      disabled={!!sourceRepo}
+      class="w-full border border-gray-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
     />
   </div>
 
@@ -122,7 +211,7 @@
       type="text"
       bind:value={execArgs}
       placeholder="server.js --port 7100"
-      class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      class="w-full border border-gray-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
     />
     <p class="text-xs text-gray-500 mt-1">Space-separated arguments</p>
   </div>
@@ -154,7 +243,7 @@
         max="65535"
         class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
       />
-      <p class="text-xs text-gray-500 mt-1">Auto-generates health URL if set</p>
+      <p class="text-xs text-gray-500 mt-1">Auto-generates endpoint and health URL</p>
     </div>
   </div>
 
@@ -182,10 +271,10 @@
     </button>
     <button
       type="submit"
-      disabled={loading}
+      disabled={loading || detecting}
       class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
     >
-      {loading ? 'Creating...' : 'Create Instance'}
+      {loading ? 'Creating...' : sourceRepo ? 'Clone, build & create' : 'Create Instance'}
     </button>
   </div>
 </form>

@@ -12,18 +12,18 @@ export class RuntimeService {
     this.db = db;
   }
 
-  createInstance(input: CreateRuntimeInstanceInput): RuntimeInstance {
+  createInstance(input: CreateRuntimeInstanceInput, status: RuntimeStatus = 'stopped'): RuntimeInstance {
     const id = randomUUID();
     const pm2Name = PM2Service.generatePM2Name(input.server_name, input.version);
 
-    const endpointUrl = input.endpoint_url ?? (input.port ? `http://127.0.0.1:${input.port}` : null);
-    const healthUrl = input.health_url ?? (input.port ? `http://127.0.0.1:${input.port}/health` : null);
+    const endpointUrl = input.endpoint_url ?? (input.port ? `http://127.0.0.1:${input.port}/mcp` : null);
+    const healthUrl = input.health_url ?? (input.port ? `http://127.0.0.1:${input.port}/mcp` : null);
 
     const stmt = this.db.prepare(`
       INSERT INTO runtime_instances (
         id, server_name, version, source, exec_cmd, exec_args, cwd, env_json,
         port, endpoint_url, health_url, pm2_name, status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'stopped')
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     stmt.run(
@@ -38,7 +38,8 @@ export class RuntimeService {
       input.port ?? null,
       endpointUrl,
       healthUrl,
-      pm2Name
+      pm2Name,
+      status
     );
 
     const created = this.getInstance(id)!;
@@ -141,6 +142,10 @@ export class RuntimeService {
     const instance = this.getInstance(id);
     if (!instance) return null;
 
+    if (instance.status === 'provisioning') {
+      throw new Error('Instance is still being provisioned (clone / install / build in progress)');
+    }
+
     this.updateStatus(id, 'starting');
 
     try {
@@ -239,7 +244,9 @@ export class RuntimeService {
     try {
       const result = await pingUrl();
 
-      const healthStatus = (result.ok || result.status === 406) ? 'healthy' : 'unhealthy';
+      // A live MCP endpoint answers a bare GET with 405 (wrong method) or 406
+      // (missing SSE Accept header). Both mean the server is up and speaking.
+      const healthStatus = (result.ok || result.status === 405 || result.status === 406) ? 'healthy' : 'unhealthy';
       this.updateHealthStatus(id, healthStatus);
 
       if (healthStatus === 'unhealthy' && instance.status === 'online') {
@@ -275,7 +282,7 @@ export class RuntimeService {
       const pm2Info = await pm2Service.describe(instance.pm2_name);
       if (pm2Info) {
         this.updateStatusFromPM2(id, pm2Info.status, pm2Info.pid, pm2Info.uptime_ms, pm2Info.restart_count);
-      } else {
+      } else if (!this.isPM2Exempt(instance.status)) {
         this.updateStatus(id, 'stopped');
       }
     } else {
@@ -287,11 +294,31 @@ export class RuntimeService {
         const pm2Info = pm2Map.get(instance.pm2_name);
         if (pm2Info) {
           this.updateStatusFromPM2(instance.id, pm2Info.status, pm2Info.pid, pm2Info.uptime_ms, pm2Info.restart_count);
-        } else {
+        } else if (!this.isPM2Exempt(instance.status)) {
           this.updateStatus(instance.id, 'stopped');
         }
       }
     }
+  }
+
+  /**
+   * States PM2 knows nothing about, and must not overwrite.
+   * `provisioning` has no process yet, and `errored` carries the reason it has
+   * none — resetting either to `stopped` throws away the only explanation the
+   * user gets for why the instance will not start.
+   */
+  private isPM2Exempt(status: RuntimeStatus): boolean {
+    return status === 'provisioning' || status === 'errored';
+  }
+
+  /** Provisioning finished: the instance now has a real command and can be started. */
+  setProvisioned(id: string): void {
+    this.updateStatus(id, 'stopped');
+  }
+
+  /** Provisioning failed: keep the reason so the card can show it. */
+  setProvisionFailed(id: string, error: string): void {
+    this.updateStatus(id, 'errored', error.slice(0, 2000));
   }
 
   private updateStatus(id: string, status: RuntimeStatus, lastError?: string): void {

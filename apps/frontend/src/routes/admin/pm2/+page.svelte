@@ -1,11 +1,13 @@
 <script lang="ts">
+  import { DataTable, ViewToggle } from '$lib/components';
   import { api } from '$lib/api/client';
   import { createRuntimeEventSource } from '$lib/api/runtime-events';
-  import type { RuntimeMetrics, RuntimeStatus } from '$lib/types';
+  import type { RuntimeMetrics, RuntimeStatus, TableColumn } from '$lib/types';
   import { isAuthenticated } from '$lib/stores/auth';
   import { goto } from '$app/navigation';
 
   let metrics = $state<RuntimeMetrics[]>([]);
+  let view = $state<'cards' | 'table'>('cards');
   let loading = $state(true);
   let error = $state<string | null>(null);
   let actionLoading = $state<string | null>(null);
@@ -105,6 +107,22 @@
     return pm2Name.replace(/^mcp--/, '').replace(/--/g, '/').replace(/-at-/g, '@');
   }
 
+  const statusVariant: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default'> = {
+    online: 'success', degraded: 'warning', errored: 'danger',
+    starting: 'info', stopping: 'info', provisioning: 'info', stopped: 'default',
+  };
+
+  const columns: TableColumn<RuntimeMetrics>[] = [
+    { key: 'status', label: 'Status', value: (m) => m.status, badge: (m) => statusVariant[m.status] ?? 'default' },
+    { key: 'name', label: 'Process', value: (m) => shortName(m.pm2_name), mono: true },
+    { key: 'version', label: 'Version', value: (m) => `v${m.version}` },
+    { key: 'cpu', label: 'CPU', value: (m) => m.cpu, align: 'right', mono: true },
+    { key: 'memory', label: 'Memory', value: (m) => (m.memory !== undefined ? formatMemory(m.memory) : null), align: 'right', mono: true },
+    { key: 'uptime', label: 'Uptime', value: (m) => (m.uptime_ms ? formatUptime(m.uptime_ms) : null), align: 'right' },
+    { key: 'restarts', label: 'Restarts', value: (m) => m.restart_count ?? 0, align: 'right' },
+    { key: 'pid', label: 'PID', value: (m) => m.pid, align: 'right', mono: true },
+  ];
+
   async function handleAction(m: RuntimeMetrics, action: 'start' | 'stop' | 'restart') {
     actionLoading = m.id + action;
     try {
@@ -167,12 +185,15 @@
         {/if}
       </p>
     </div>
-    <a
-      href="/admin/runtime"
-      class="text-sm text-blue-600 hover:text-blue-700"
-    >
-      ← Instance Management
-    </a>
+    <div class="flex items-center gap-3">
+      <ViewToggle bind:value={view} storageKey="view:pm2" />
+      <a
+        href="/admin/runtime"
+        class="text-sm text-blue-600 hover:text-blue-700"
+      >
+        ← Instance Management
+      </a>
+    </div>
   </div>
 
   <!-- Summary bar -->
@@ -213,6 +234,28 @@
       <a href="/admin/runtime" class="text-sm text-blue-600 hover:underline">Go to Runtime →</a>
     </div>
 
+  {:else if view === 'table'}
+    <DataTable rows={metrics} {columns} rowKey={(m) => m.id}>
+      {#snippet actions(m)}
+        {#if m.status === 'stopped' || m.status === 'errored'}
+          <button type="button" onclick={() => handleAction(m, 'start')} disabled={actionLoading !== null}
+            class="px-2 py-1 text-xs font-medium text-white bg-green-600 rounded hover:bg-green-700 disabled:opacity-50">
+            {actionLoading === m.id + 'start' ? '...' : 'Start'}
+          </button>
+        {:else}
+          <button type="button" onclick={() => handleAction(m, 'stop')} disabled={actionLoading !== null}
+            class="px-2 py-1 text-xs font-medium text-white bg-yellow-600 rounded hover:bg-yellow-700 disabled:opacity-50">
+            {actionLoading === m.id + 'stop' ? '...' : 'Stop'}
+          </button>
+        {/if}
+        <button type="button" onclick={() => handleAction(m, 'restart')} disabled={actionLoading !== null || m.status === 'stopped'}
+          class="px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50">
+          {actionLoading === m.id + 'restart' ? '...' : 'Restart'}
+        </button>
+        <button type="button" onclick={() => openLogs(m)}
+          class="px-2 py-1 text-xs font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200">Logs</button>
+      {/snippet}
+    </DataTable>
   {:else}
     <!-- Process grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">

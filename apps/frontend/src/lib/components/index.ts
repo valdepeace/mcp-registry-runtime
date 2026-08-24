@@ -11,3 +11,6 @@ export { default as InspectModal } from './InspectModal.svelte';
 export { default as JsonOutput } from './JsonOutput.svelte';
 export { default as ServerCombobox } from './ServerCombobox.svelte';
 export { default as ProviderCard } from './ProviderCard.svelte';
+export { default as DataTable } from './DataTable.svelte';
+export { default as ViewToggle } from './ViewToggle.svelte';
+export { default as Icon } from './Icon.svelte';

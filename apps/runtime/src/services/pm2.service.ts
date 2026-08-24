@@ -2,6 +2,7 @@ import pm2SDK from 'pm2';
 import { readFileSync, existsSync } from 'fs';
 import type { ProcessDescription } from 'pm2';
 import type { RuntimeStatus, PM2ProcessInfo } from '@mcp/types';
+import { launchable, isNodeScript } from './spawn-compat.js';
 
 export class PM2Service {
   private connected = false;
@@ -52,16 +53,16 @@ export class PM2Service {
     cwd?: string,
     env?: Record<string, string>
   ): Promise<void> {
-    const isNodeScript = cmd.endsWith('.js') || cmd.endsWith('.mjs') || cmd.endsWith('.cjs');
+    const { command: script, args: scriptArgs } = launchable(cmd, args);
 
     const options: pm2SDK.StartOptions = {
       name: pm2Name,
-      script: cmd,
-      args: args.length > 0 ? args : undefined,
+      script,
+      args: scriptArgs.length > 0 ? scriptArgs : undefined,
       cwd,
       env: env ? ({ ...process.env, ...env } as Record<string, string>) : undefined,
       max_restarts: 5,
-      interpreter: isNodeScript ? undefined : 'none',
+      interpreter: isNodeScript(cmd) ? undefined : 'none',
     };
 
     await this.run(() => new Promise<void>((resolve, reject) => {
@@ -70,6 +71,15 @@ export class PM2Service {
         else resolve();
       });
     }));
+
+    // PM2 can accept a start and still not run anything. Without this check the
+    // instance goes back to `stopped` with no explanation at all.
+    const started = await this.describe(pm2Name);
+    if (!started) {
+      throw new Error(
+        `PM2 accepted the start but no process appeared. \`${cmd}\` may not exist on this machine or may not be executable directly.`
+      );
+    }
   }
 
   async stop(pm2Name: string): Promise<void> {

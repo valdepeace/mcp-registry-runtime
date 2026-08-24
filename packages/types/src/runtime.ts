@@ -3,7 +3,15 @@
  * For managing locally running MCP server processes via PM2
  */
 
-export type RuntimeStatus = 'stopped' | 'starting' | 'online' | 'stopping' | 'errored' | 'degraded';
+export type RuntimeStatus =
+  /** Repo is being cloned, dependencies installed and the project built. */
+  | 'provisioning'
+  | 'stopped'
+  | 'starting'
+  | 'online'
+  | 'stopping'
+  | 'errored'
+  | 'degraded';
 
 export interface RuntimeInstance {
   id: string;

@@ -1,12 +1,13 @@
 <script lang="ts">
   import { api } from '$lib/api/client';
   import { createRuntimeEventSource } from '$lib/api/runtime-events';
-  import { RuntimeCard, Modal, CreateRuntimeForm, EditRuntimeForm, InspectModal, ServerCombobox } from '$lib/components';
-  import type { RuntimeInstance, CreateRuntimeInstanceInput, UpdateRuntimeInstanceInput, ServerListItem } from '$lib/types';
+  import { RuntimeCard, Modal, CreateRuntimeForm, EditRuntimeForm, InspectModal, DataTable, ViewToggle, Icon } from '$lib/components';
+  import type { RuntimeInstance, CreateRuntimeInstanceInput, UpdateRuntimeInstanceInput, TableColumn } from '$lib/types';
   import { isAuthenticated } from '$lib/stores/auth';
   import { goto } from '$app/navigation';
 
   let instances = $state<RuntimeInstance[]>([]);
+  let view = $state<'cards' | 'table'>('cards');
   let loading = $state(true);
   let actionLoading = $state<string | null>(null);
   let error = $state<string | null>(null);
@@ -16,7 +17,6 @@
 
   // Modals
   let showCreateModal = $state(false);
-  let showFromCatalogModal = $state(false);
   let showLogsModal = $state(false);
   let showEditModal = $state(false);
   let editInstance = $state<RuntimeInstance | null>(null);
@@ -25,17 +25,34 @@
   let logsContent = $state('');
   let logsLoading = $state(false);
 
-  // From catalog form
-  let catalogServerName = $state('');
-  let catalogVersion = $state('');
-  let selectedServer = $state<ServerListItem | null>(null);
-
-  function handleServerSelect(server: ServerListItem | null) {
-    selectedServer = server;
-    if (server) {
-      catalogVersion = server.version;
-    }
+  function uptime(ms?: number): string {
+    if (!ms) return '';
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return `${s}s`;
+    if (s < 3600) return `${Math.floor(s / 60)}m ${s % 60}s`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`;
+    return `${Math.floor(s / 86400)}d ${Math.floor((s % 86400) / 3600)}h`;
   }
+
+  const statusVariant: Record<string, 'success' | 'warning' | 'danger' | 'info' | 'default'> = {
+    online: 'success', degraded: 'warning', errored: 'danger',
+    starting: 'info', stopping: 'info', provisioning: 'info', stopped: 'default',
+  };
+
+  const columns: TableColumn<RuntimeInstance>[] = [
+    { key: 'status', label: 'Status', value: (i) => i.status, badge: (i) => statusVariant[i.status] ?? 'default' },
+    { key: 'server', label: 'MCP', value: (i) => i.server_name },
+    { key: 'version', label: 'Version', value: (i) => `v${i.version}` },
+    { key: 'pm2', label: 'PM2', value: (i) => i.pm2_name, mono: true },
+    { key: 'port', label: 'Port', value: (i) => i.port, align: 'right', mono: true },
+    { key: 'pid', label: 'PID', value: (i) => i.pid, align: 'right', mono: true },
+    { key: 'uptime', label: 'Uptime', value: (i) => uptime(i.uptime_ms), align: 'right' },
+    { key: 'restarts', label: 'Restarts', value: (i) => i.restart_count ?? 0, align: 'right' },
+    {
+      key: 'health', label: 'Health', value: (i) => i.health_status,
+      badge: (i) => (i.health_status === 'healthy' ? 'success' : i.health_status === 'unhealthy' ? 'danger' : 'default'),
+    },
+  ];
 
   const selectedCount = $derived(selectedIds.size);
   const canBulkStart = $derived(
@@ -172,34 +189,19 @@
     }
   }
 
-  async function handleCreate(input: CreateRuntimeInstanceInput) {
+  async function handleCreate(input: CreateRuntimeInstanceInput, opts?: { buildFromSource?: boolean }) {
     actionLoading = 'create';
     try {
-      await api.createRuntimeInstance(input);
+      if (opts?.buildFromSource) {
+        // No package to run: the runtime clones, installs and builds it first.
+        await api.createRuntimeFromCatalog(input.server_name, input.version, true, false);
+      } else {
+        await api.createRuntimeInstance(input);
+      }
       showCreateModal = false;
       await fetchInstances();
     } catch (e) {
       error = e instanceof Error ? e.message : 'Failed to create';
-    } finally {
-      actionLoading = null;
-    }
-  }
-
-  async function handleCreateFromCatalog() {
-    if (!catalogServerName) {
-      error = 'MCP name is required';
-      return;
-    }
-    
-    actionLoading = 'from-catalog';
-    try {
-      await api.createRuntimeFromCatalog(catalogServerName, catalogVersion || undefined);
-      showFromCatalogModal = false;
-      catalogServerName = '';
-      catalogVersion = '';
-      await fetchInstances();
-    } catch (e) {
-      error = e instanceof Error ? e.message : 'Failed to create from catalog';
     } finally {
       actionLoading = null;
     }
@@ -323,6 +325,7 @@
       <p class="text-gray-600">Manage locally running MCP servers</p>
     </div>
     <div class="flex gap-2">
+      <ViewToggle bind:value={view} storageKey="view:runtime" />
       <button
         type="button"
         onclick={handleSync}
@@ -330,13 +333,6 @@
         class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
       >
         Sync Status
-      </button>
-      <button
-        type="button"
-        onclick={() => showFromCatalogModal = true}
-        class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
-      >
-        From Catalog
       </button>
       <button
         type="button"
@@ -419,20 +415,55 @@
       <div class="flex justify-center gap-2">
         <button
           type="button"
-          onclick={() => showFromCatalogModal = true}
-          class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50"
-        >
-          Create from Catalog
-        </button>
-        <button
-          type="button"
           onclick={() => showCreateModal = true}
-          class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+          class=""
         >
-          Create Manually
+          Create Instance
         </button>
       </div>
     </div>
+  {:else if view === 'table'}
+    <DataTable
+      rows={instances}
+      {columns}
+      rowKey={(i) => i.id}
+      selected={(i) => selectedIds.has(i.id)}
+      onselect={(i) => toggleSelection(i.id)}
+    >
+      {#snippet actions(instance)}
+        {@const busy = actionLoading === instance.id}
+        {@const running = instance.status === 'online' || instance.status === 'degraded'}
+        {@const iconBtn = 'p-1.5 rounded disabled:opacity-40 disabled:cursor-not-allowed'}
+        {#if running}
+          <button type="button" onclick={() => handleStop(instance.id)} disabled={busy}
+            title="Stop" aria-label="Stop"
+            class="{iconBtn} text-yellow-700 hover:bg-yellow-50"><Icon name="stop" /></button>
+          <button type="button" onclick={() => handleRestart(instance.id)} disabled={busy}
+            title="Restart" aria-label="Restart"
+            class="{iconBtn} text-gray-600 hover:bg-gray-100"><Icon name="restart" /></button>
+        {:else}
+          <button type="button" onclick={() => handleStart(instance.id)} disabled={busy || instance.status === 'provisioning'}
+            title="Start" aria-label="Start"
+            class="{iconBtn} text-green-700 hover:bg-green-50"><Icon name="play" /></button>
+        {/if}
+        <button type="button" onclick={() => handleShowLogs(instance)}
+          title="Logs" aria-label="Logs"
+          class="{iconBtn} text-gray-600 hover:bg-gray-100"><Icon name="logs" /></button>
+        <button type="button" onclick={() => handleOpenEdit(instance)}
+          title="Edit" aria-label="Edit"
+          class="{iconBtn} text-gray-600 hover:bg-gray-100"><Icon name="edit" /></button>
+        <button
+          type="button"
+          onclick={() => inspectInstance = instance}
+          disabled={!!instance.endpoint_url && !running}
+          title={instance.endpoint_url && !running ? 'Start instance to inspect (HTTP mode)' : 'Inspect MCP server'}
+          aria-label="Inspect"
+          class="{iconBtn} text-purple-700 hover:bg-purple-50"><Icon name="inspect" /></button>
+        <button type="button" onclick={() => handleDelete(instance.id)} disabled={busy || running}
+          title="Delete" aria-label="Delete"
+          class="{iconBtn} text-red-600 hover:bg-red-50"><Icon name="delete" /></button>
+      {/snippet}
+    </DataTable>
   {:else}
     <!-- Instance grid -->
     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -477,69 +508,6 @@
   />
 </Modal>
 
-<!-- From Catalog Modal -->
-<Modal
-  open={showFromCatalogModal}
-  title="Create from Catalog"
-  onClose={() => showFromCatalogModal = false}
->
-  <form onsubmit={(e) => { e.preventDefault(); handleCreateFromCatalog(); }} class="space-y-4">
-    <p class="text-sm text-gray-600">
-      Auto-detect runtime configuration from a server in the catalog.
-    </p>
-    
-    <div>
-      <label for="catalogServerName" class="block text-sm font-medium text-gray-700 mb-1">
-        MCP <span class="text-red-500">*</span>
-      </label>
-      <ServerCombobox
-        bind:value={catalogServerName}
-        onSelect={handleServerSelect}
-        placeholder="Search MCPs..."
-        disabled={actionLoading === 'from-catalog'}
-      />
-      {#if selectedServer}
-        <div class="mt-2 p-2 bg-gray-50 rounded text-xs text-gray-600">
-          <div class="font-medium text-gray-800">{selectedServer.name}</div>
-          {#if selectedServer.description}
-            <div class="truncate">{selectedServer.description}</div>
-          {/if}
-        </div>
-      {/if}
-    </div>
-
-    <div>
-      <label for="catalogVersion" class="block text-sm font-medium text-gray-700 mb-1">
-        Version
-      </label>
-      <input
-        id="catalogVersion"
-        type="text"
-        bind:value={catalogVersion}
-        placeholder="Leave empty for latest"
-        disabled={actionLoading === 'from-catalog'}
-        class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-      />
-    </div>
-
-    <div class="flex justify-end gap-3 pt-4 border-t">
-      <button
-        type="button"
-        onclick={() => showFromCatalogModal = false}
-        class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
-      >
-        Cancel
-      </button>
-      <button
-        type="submit"
-        disabled={actionLoading === 'from-catalog' || !catalogServerName}
-        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
-      >
-        {actionLoading === 'from-catalog' ? 'Creating...' : 'Create'}
-      </button>
-    </div>
-  </form>
-</Modal>
 
 <!-- Inspect Modal -->
 {#if inspectInstance}

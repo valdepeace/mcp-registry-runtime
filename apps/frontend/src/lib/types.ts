@@ -275,6 +275,16 @@ export interface RuntimeListResponse {
   instances: RuntimeInstance[];
 }
 
+export interface DetectedRuntimeConfig {
+  exec_cmd: string;
+  exec_args: string[];
+  env_json: Record<string, string>;
+  cwd?: string;
+  port?: number;
+  /** Present when the MCP has no package: it is cloned and built from source. */
+  provision?: { repository: string; subfolder?: string };
+}
+
 export interface RuntimeInstanceResponse {
   instance: RuntimeInstance;
 }
@@ -308,3 +318,16 @@ export interface SkillListParams {
 }
 
 
+/** One column of a DataTable. `value` feeds both the cell text and the sorting. */
+export interface TableColumn<Row> {
+  key: string;
+  label: string;
+  value: (row: Row) => string | number | null | undefined;
+  /** Render the cell as a link to this href. */
+  link?: (row: Row) => string;
+  /** Render the cell as a Chip of this variant. */
+  badge?: (row: Row) => 'default' | 'primary' | 'success' | 'warning' | 'danger' | 'info' | 'purple';
+  align?: 'left' | 'right';
+  mono?: boolean;
+  sortable?: boolean;
+}

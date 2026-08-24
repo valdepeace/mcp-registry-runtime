@@ -24,6 +24,7 @@
   );
 
   const statusConfig: Record<RuntimeStatus, { color: 'success' | 'warning' | 'danger' | 'info' | 'default'; label: string }> = {
+    provisioning: { color: 'info', label: 'Provisioning' },
     online: { color: 'success', label: 'Online' },
     degraded: { color: 'warning', label: 'Degraded' },
     starting: { color: 'info', label: 'Starting' },
@@ -52,6 +53,7 @@
   }
 
   const isRunning = $derived(instance.status === 'online' || instance.status === 'degraded');
+  // Nothing to start until the repo is cloned, installed and built.
   const canStart = $derived(instance.status === 'stopped' || instance.status === 'errored');
   const canStop = $derived(isRunning || instance.status === 'starting');
 </script>

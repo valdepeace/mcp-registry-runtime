@@ -1,5 +1,7 @@
 import { spawn } from 'child_process';
 import { createInterface } from 'readline';
+import { PENDING_PROVISION } from './provision.service.js';
+import { launchable } from './spawn-compat.js';
 import type { RuntimeInstance } from '@mcp/types';
 
 export interface McpTool {
@@ -169,6 +171,13 @@ class McpInspectorService {
             }
           }
         }
+
+        // Streamable HTTP lets a server hold the SSE stream open after
+        // answering. Waiting for it to close would hang until the timeout.
+        if (found) {
+          await reader.cancel().catch(() => {});
+          break;
+        }
       }
     } finally {
       signal.removeEventListener('abort', onAbort);
@@ -208,13 +217,18 @@ class McpInspectorService {
   }
 
   private async connectStdio(instance: RuntimeInstance): Promise<StdioSession> {
+    if (instance.status === 'provisioning' || instance.exec_cmd === PENDING_PROVISION) {
+      throw new Error('Instance is still being provisioned — there is no command to inspect yet');
+    }
+
     const env: Record<string, string> = {};
     for (const [k, v] of Object.entries(process.env)) {
       if (v !== undefined) env[k] = v;
     }
     Object.assign(env, instance.env_json ?? {});
 
-    const child = spawn(instance.exec_cmd, instance.exec_args ?? [], {
+    const { command, args } = launchable(instance.exec_cmd, instance.exec_args ?? []);
+    const child = spawn(command, args, {
       cwd: instance.cwd ?? undefined,
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
