@@ -336,6 +336,22 @@ class ApiClient {
     });
   }
 
+  /** Run an MCP straight from a folder already on this machine — no clone, runs in place. */
+  async createRuntimeFromLocalFolder(path: string, port?: number, autoStart?: boolean): Promise<RuntimeInstanceResponse & { detected: DetectedRuntimeConfig; message?: string }> {
+    return this.request('/admin/runtime/instances/from-local-folder', {
+      method: 'POST',
+      body: JSON.stringify({ path, port, auto_start: autoStart ?? false })
+    });
+  }
+
+  /** Same detection as createRuntimeFromLocalFolder, but returns the config instead of creating it. */
+  async previewRuntimeFromLocalFolder(path: string, port?: number): Promise<{ detected: DetectedRuntimeConfig }> {
+    return this.request('/admin/runtime/instances/from-local-folder', {
+      method: 'POST',
+      body: JSON.stringify({ path, port, dry_run: true })
+    });
+  }
+
   // MCP Inspector API
 
   async getInspectCapabilities(id: string): Promise<McpCapabilities> {

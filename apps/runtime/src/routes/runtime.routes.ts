@@ -1,6 +1,8 @@
 import { Router, Request, Response } from 'express';
 import { spawn } from 'child_process';
-import { runtimeService, databaseService, runtimeEventBus, mcpInspectorService, pm2Service, provisionService, PENDING_PROVISION } from '../services/index.js';
+import fs from 'fs';
+import path from 'path';
+import { runtimeService, databaseService, runtimeEventBus, mcpInspectorService, pm2Service, provisionService, detectProject, PENDING_PROVISION } from '../services/index.js';
 import type { RuntimeEventName } from '../services/index.js';
 import { validateBody, validateQuery } from '../middleware/index.js';
 import {
@@ -326,6 +328,86 @@ router.post('/instances/from-catalog', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('[Runtime] Error creating from catalog:', err);
     res.status(500).json({ error: 'Failed to create from catalog' });
+    return;
+  }
+});
+
+/**
+ * Run an MCP straight from a folder already on this machine — a local dev
+ * checkout, not tied to any catalog entry. No clone: PM2 runs it in place, so
+ * editing the folder and hitting Restart in the dashboard picks up the change
+ * immediately.
+ */
+router.post('/instances/from-local-folder', async (req: Request, res: Response) => {
+  try {
+    const { path: dir, server_name, version, port, auto_start, dry_run } = req.body as {
+      path: string;
+      server_name?: string;
+      version?: string;
+      port?: number;
+      auto_start?: boolean;
+      dry_run?: boolean;
+    };
+
+    if (!dir) {
+      res.status(400).json({ error: 'path required' });
+      return;
+    }
+    if (!path.isAbsolute(dir)) {
+      res.status(400).json({ error: 'path must be absolute' });
+      return;
+    }
+    if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) {
+      res.status(400).json({ error: `Not a directory: ${dir}` });
+      return;
+    }
+
+    // No catalog entry to name this from — derive one from the folder itself,
+    // e.g. "local/my-mcp-server". Editable afterwards like anything else.
+    const folderName = path.basename(dir).replace(/[^a-zA-Z0-9._-]/g, '-') || 'server';
+    const pkg = fs.existsSync(path.join(dir, 'package.json'))
+      ? JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf-8'))
+      : null;
+
+    const resolvedServerName = server_name || `local/${folderName}`;
+    const resolvedVersion = version || pkg?.version || '0.0.0-local';
+
+    if (dry_run) {
+      const plan = detectProject(dir, port);
+      res.json({
+        detected: plan
+          ? { exec_cmd: plan.start.cmd, exec_args: plan.start.args, env_json: {}, cwd: dir, port }
+          : { exec_cmd: '', exec_args: [], env_json: {}, cwd: dir, port },
+      });
+      return;
+    }
+
+    const instance = runtimeService.createInstance(
+      {
+        server_name: resolvedServerName,
+        version: resolvedVersion,
+        exec_cmd: PENDING_PROVISION,
+        port,
+      } as any,
+      'provisioning',
+    );
+
+    void provisionService
+      .provisionLocal(instance.id, dir, resolvedServerName, port)
+      .then(async () => {
+        if (!auto_start) return;
+        const ready = runtimeService.getInstance(instance.id);
+        if (ready?.status === 'stopped') await runtimeService.startInstance(instance.id);
+      });
+
+    res.status(202).json({
+      instance,
+      message: 'Installing dependencies and building in place. Watch the instance for progress.',
+    });
+    return;
+  } catch (err) {
+    console.error('[Runtime] Error creating from local folder:', err);
+    res.status(500).json({ error: 'Failed to create from local folder' });
     return;
   }
 });

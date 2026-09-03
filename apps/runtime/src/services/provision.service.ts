@@ -150,14 +150,7 @@ export class ProvisionService {
     port?: number,
     subfolder?: string,
   ): Promise<void> {
-    const emit = (step: string) => {
-      console.log(`[Provision] ${serverName}: ${step}`);
-      runtimeEventBus.emitRuntime('instance:status', {
-        id: instanceId,
-        status: 'provisioning',
-        last_error: step,
-      });
-    };
+    const emit = (step: string) => this.emit(instanceId, serverName, step);
 
     try {
       emit('cloning repository');
@@ -169,32 +162,70 @@ export class ProvisionService {
         throw new Error(`Repository has no "${subfolder}" directory`);
       }
 
-      const plan = detectProject(dir, port);
-      if (!plan) {
-        throw new Error(
-          'Cloned the repo but found no package.json, pyproject.toml, requirements.txt or Dockerfile to build from'
-        );
-      }
-
-      const adapted = await this.adaptToMachine(plan);
-
-      for (const step of adapted.setup) {
-        emit(`${step.cmd} ${step.args.join(' ')}`);
-        await this.run(step, dir);
-      }
-
-      this.runtime.updateInstance(instanceId, {
-        exec_cmd: adapted.start.cmd,
-        exec_args: adapted.start.args,
-        cwd: dir,
-      });
-      this.runtime.setProvisioned(instanceId);
-      console.log(`[Provision] ${serverName}: ready — ${adapted.start.cmd} ${adapted.start.args.join(' ')}`);
+      await this.provisionDir(instanceId, dir, serverName, port, 'Cloned the repo but found');
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Provisioning failed';
-      console.error(`[Provision] ${serverName}: failed —`, message);
-      this.runtime.setProvisionFailed(instanceId, message);
+      this.fail(instanceId, serverName, err);
     }
+  }
+
+  /**
+   * Same as `provision()`, minus the clone: point straight at a folder already
+   * on this machine and install/build/run it in place. Editing that folder and
+   * hitting Restart in the dashboard picks the change up immediately — nothing
+   * to re-clone or re-copy.
+   */
+  async provisionLocal(instanceId: string, dir: string, serverName: string, port?: number): Promise<void> {
+    try {
+      await this.provisionDir(instanceId, dir, serverName, port, 'Found');
+    } catch (err) {
+      this.fail(instanceId, serverName, err);
+    }
+  }
+
+  private emit(instanceId: string, serverName: string, step: string): void {
+    console.log(`[Provision] ${serverName}: ${step}`);
+    runtimeEventBus.emitRuntime('instance:status', {
+      id: instanceId,
+      status: 'provisioning',
+      last_error: step,
+    });
+  }
+
+  private fail(instanceId: string, serverName: string, err: unknown): void {
+    const message = err instanceof Error ? err.message : 'Provisioning failed';
+    console.error(`[Provision] ${serverName}: failed —`, message);
+    this.runtime.setProvisionFailed(instanceId, message);
+  }
+
+  /** Detect, install and build whatever is in `dir`, then point the instance at it. */
+  private async provisionDir(
+    instanceId: string,
+    dir: string,
+    serverName: string,
+    port: number | undefined,
+    notFoundPrefix: string,
+  ): Promise<void> {
+    const plan = detectProject(dir, port);
+    if (!plan) {
+      throw new Error(
+        `${notFoundPrefix} no package.json, pyproject.toml, requirements.txt or Dockerfile to build from`
+      );
+    }
+
+    const adapted = await this.adaptToMachine(plan);
+
+    for (const step of adapted.setup) {
+      this.emit(instanceId, serverName, `${step.cmd} ${step.args.join(' ')}`);
+      await this.run(step, dir);
+    }
+
+    this.runtime.updateInstance(instanceId, {
+      exec_cmd: adapted.start.cmd,
+      exec_args: adapted.start.args,
+      cwd: dir,
+    });
+    this.runtime.setProvisioned(instanceId);
+    console.log(`[Provision] ${serverName}: ready — ${adapted.start.cmd} ${adapted.start.args.join(' ')}`);
   }
 
   /**

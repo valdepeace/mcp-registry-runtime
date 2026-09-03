@@ -5,6 +5,8 @@
 
   interface Props {
     onSubmit: (input: CreateRuntimeInstanceInput, opts?: { buildFromSource?: boolean }) => void;
+    /** Local-folder mode bypasses the catalog entirely — no server_name/version to validate. */
+    onSubmitLocal: (input: { path: string; port?: number }) => void;
     onCancel: () => void;
     loading?: boolean;
     /** Preselected MCP, e.g. when opened from a catalog card. */
@@ -14,11 +16,51 @@
 
   let {
     onSubmit,
+    onSubmitLocal,
     onCancel,
     loading = false,
     initialServerName = '',
     initialVersion = '',
   }: Props = $props();
+
+  let mode = $state<'catalog' | 'local'>('catalog');
+  let localPath = $state('');
+  let localPort = $state('');
+  let localDetecting = $state(false);
+  let localPreview = $state<{ exec_cmd: string; exec_args: string[] } | null>(null);
+  let localError = $state<string | null>(null);
+
+  async function detectLocal() {
+    if (!localPath.trim()) return;
+    localDetecting = true;
+    localError = null;
+    localPreview = null;
+    try {
+      const { detected } = await api.previewRuntimeFromLocalFolder(localPath.trim(), localPort ? parseInt(localPort, 10) : undefined);
+      if (!detected.exec_cmd) {
+        localError = 'No package.json, pyproject.toml, requirements.txt or Dockerfile found in that folder.';
+      } else {
+        localPreview = { exec_cmd: detected.exec_cmd, exec_args: detected.exec_args ?? [] };
+      }
+    } catch (e) {
+      localError = e instanceof Error ? e.message : 'Could not read that folder';
+    } finally {
+      localDetecting = false;
+    }
+  }
+
+  function handleSubmitLocal(e: Event) {
+    e.preventDefault();
+    localError = null;
+    if (!localPath.trim()) {
+      localError = 'Folder path is required';
+      return;
+    }
+    onSubmitLocal({
+      path: localPath.trim(),
+      port: localPort ? parseInt(localPort, 10) : undefined,
+    });
+  }
 
   let serverName = $state(initialServerName);
   let version = $state(initialVersion);
@@ -126,6 +168,108 @@
     );
   }
 </script>
+
+<div class="flex gap-2 border-b mb-4">
+  <button
+    type="button"
+    onclick={() => mode = 'catalog'}
+    class="px-3 py-2 text-sm font-medium border-b-2 -mb-px {mode === 'catalog' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}"
+  >
+    From catalog
+  </button>
+  <button
+    type="button"
+    onclick={() => mode = 'local'}
+    class="px-3 py-2 text-sm font-medium border-b-2 -mb-px {mode === 'local' ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}"
+  >
+    From local folder
+  </button>
+</div>
+
+{#if mode === 'local'}
+  <form onsubmit={handleSubmitLocal} class="space-y-4">
+    {#if localError}
+      <div class="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded text-sm">
+        {localError}
+      </div>
+    {/if}
+
+    <div>
+      <label for="localPath" class="block text-sm font-medium text-gray-700 mb-1">
+        Folder path <span class="text-red-500">*</span>
+      </label>
+      <div class="flex gap-2">
+        <input
+          id="localPath"
+          type="text"
+          bind:value={localPath}
+          placeholder="E:\dev\my-mcp-server"
+          disabled={loading}
+          class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        <button
+          type="button"
+          onclick={detectLocal}
+          disabled={loading || localDetecting || !localPath.trim()}
+          class="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
+        >
+          {localDetecting ? 'Detecting…' : 'Detect'}
+        </button>
+      </div>
+      <p class="text-xs text-gray-500 mt-1">
+        An absolute path on this machine. Runs in place — no clone, no copy. Edit the folder and hit Restart to pick up changes.
+      </p>
+    </div>
+
+    <div>
+      <label for="localPort" class="block text-sm font-medium text-gray-700 mb-1">
+        Port
+      </label>
+      <input
+        id="localPort"
+        type="number"
+        bind:value={localPort}
+        placeholder="leave empty for a stdio server"
+        min="1"
+        max="65535"
+        disabled={loading}
+        class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+      />
+      <p class="text-xs text-gray-500 mt-1">
+        Set this only if the MCP speaks HTTP on a local port. Leave empty for stdio.
+      </p>
+    </div>
+
+    {#if localPreview}
+      <div class="bg-blue-50 border border-blue-200 text-blue-800 px-3 py-2 rounded text-xs">
+        <span class="font-medium">Detected:</span>
+        <code class="ml-1 break-all">{localPreview.exec_cmd} {localPreview.exec_args.join(' ')}</code>
+      </div>
+    {/if}
+
+    <div class="bg-gray-50 border border-gray-200 rounded-lg p-3 text-xs text-gray-600">
+      Dependencies are installed and the project built here before it starts — same as cloning from the catalog, minus the clone.
+    </div>
+
+    <div class="flex justify-end gap-3 pt-4 border-t">
+      <button
+        type="button"
+        onclick={onCancel}
+        disabled={loading}
+        class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
+      >
+        Cancel
+      </button>
+      <button
+        type="submit"
+        disabled={loading}
+        class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700 disabled:opacity-50"
+      >
+        {loading ? 'Creating...' : 'Install, build & create'}
+      </button>
+    </div>
+  </form>
+{:else}
 
 <form onsubmit={handleSubmit} class="space-y-4">
   {#if error}
@@ -278,3 +422,4 @@
     </button>
   </div>
 </form>
+{/if}

@@ -215,6 +215,20 @@
     }
   }
 
+  async function handleCreateLocal(input: { path: string; port?: number }) {
+    actionLoading = 'create';
+    try {
+      // Installs and builds in place — no clone, no catalog entry needed.
+      await api.createRuntimeFromLocalFolder(input.path, input.port, false);
+      showCreateModal = false;
+      await fetchInstances();
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to create';
+    } finally {
+      actionLoading = null;
+    }
+  }
+
   async function handleSync() {
     loading = true;
     try {
@@ -513,6 +527,7 @@
   <CreateRuntimeForm
     loading={actionLoading === 'create'}
     onSubmit={handleCreate}
+    onSubmitLocal={handleCreateLocal}
     onCancel={() => showCreateModal = false}
   />
 </Modal>
