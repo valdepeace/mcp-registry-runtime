@@ -1,8 +1,19 @@
 import pm2SDK from 'pm2';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, mkdirSync } from 'fs';
+import path from 'path';
 import type { ProcessDescription } from 'pm2';
 import type { RuntimeStatus, PM2ProcessInfo } from '@mcp/types';
-import { launchable, isNodeScript } from './spawn-compat.js';
+import { launchable, isNodeScript, type LogPaths } from './spawn-compat.js';
+import { config } from '../config/index.js';
+
+/** Where a shell-wrapped Windows launch (see spawn-compat.ts) writes its own
+ *  stdout/stderr, since PM2 doesn't capture that case natively there. */
+function ownLogPaths(pm2Name: string): LogPaths {
+  return {
+    out: path.join(config.logsDir, `${pm2Name}-out.log`),
+    err: path.join(config.logsDir, `${pm2Name}-err.log`),
+  };
+}
 
 export class PM2Service {
   private connected = false;
@@ -53,7 +64,15 @@ export class PM2Service {
     cwd?: string,
     env?: Record<string, string>
   ): Promise<void> {
-    const { command: script, args: scriptArgs } = launchable(cmd, args);
+    mkdirSync(config.logsDir, { recursive: true });
+    const { command: script, args: scriptArgs } = launchable(cmd, args, process.platform, ownLogPaths(pm2Name));
+
+    // PM2 keeps an app's *previous* script/args/interpreter when you `start`
+    // a name it already knows, silently ignoring whatever's passed here —
+    // verified directly (an edited command kept running the old one until
+    // the process was deleted first). Delete any stale definition so this
+    // start always actually applies what's asked for.
+    await this.delete(pm2Name);
 
     const options: pm2SDK.StartOptions = {
       name: pm2Name,
@@ -62,7 +81,11 @@ export class PM2Service {
       cwd,
       env: env ? ({ ...process.env, ...env } as Record<string, string>) : undefined,
       max_restarts: 5,
-      interpreter: isNodeScript(cmd) ? undefined : 'none',
+      // Only the untouched direct-launch case (script === cmd) can still be a
+      // bare .js file PM2 should auto-interpret with node; every wrapped case
+      // (cmd.exe, or our own launch-and-log.mjs via process.execPath) is
+      // already a concrete executable.
+      interpreter: script === cmd && isNodeScript(cmd) ? undefined : 'none',
     };
 
     await this.run(() => new Promise<void>((resolve, reject) => {
@@ -137,6 +160,32 @@ export class PM2Service {
   }
 
   async logsTail(pm2Name: string, lines: number = 200): Promise<string> {
+    const tailFile = (filePath?: string): string[] => {
+      if (!filePath || !existsSync(filePath)) return [];
+      try {
+        return readFileSync(filePath, 'utf-8').split('\n').slice(-lines);
+      } catch {
+        return [];
+      }
+    };
+
+    const render = (outPath: string | undefined, out: string, errPath: string | undefined, err: string): string => {
+      if (out && err && outPath !== errPath) {
+        return `=== stdout ===\n${out}\n\n=== stderr ===\n${err}`;
+      }
+      return out || err || '';
+    };
+
+    // Windows cmd-wrapped launches (npx/npm/uv — see spawn-compat.ts) redirect
+    // their own output here, since PM2 never captures it through `cmd /c`.
+    // Check these first; they're empty for anything PM2 does capture natively.
+    const own = ownLogPaths(pm2Name);
+    const ownOut = tailFile(own.out).join('\n').trim();
+    const ownErr = tailFile(own.err).join('\n').trim();
+    if (ownOut || ownErr) {
+      return render(own.out, ownOut, own.err, ownErr);
+    }
+
     let outPath: string | undefined;
     let errPath: string | undefined;
 
@@ -154,22 +203,10 @@ export class PM2Service {
       return '';
     }
 
-    const tailFile = (filePath?: string): string[] => {
-      if (!filePath || !existsSync(filePath)) return [];
-      try {
-        return readFileSync(filePath, 'utf-8').split('\n').slice(-lines);
-      } catch {
-        return [];
-      }
-    };
-
     const out = tailFile(outPath).join('\n').trim();
     const err = tailFile(errPath).join('\n').trim();
 
-    if (out && err && outPath !== errPath) {
-      return `=== stdout ===\n${out}\n\n=== stderr ===\n${err}`;
-    }
-    return out || err || '';
+    return render(outPath, out, errPath, err);
   }
 
   disconnect(): void {

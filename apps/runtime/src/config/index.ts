@@ -19,6 +19,12 @@ const DEFAULT_DB_PATH = path.join(WORKSPACE_ROOT, 'mcp-registry-runtime-data', '
 // of where `npm run dev:runtime` was launched.
 const DEFAULT_REPOS_DIR = path.join(os.homedir(), '.registry-mcp-runtime', 'repos');
 
+// On Windows, npx/npm/uv etc. can only be launched via `cmd /c` (they're .cmd
+// shims — see spawn-compat.ts), and PM2 does not capture stdout/stderr from a
+// process nested under cmd.exe there. pm2.service.ts redirects into files
+// under this dir itself instead of relying on PM2's own (empty) log capture.
+const DEFAULT_LOGS_DIR = path.join(os.homedir(), '.registry-mcp-runtime', 'logs');
+
 const ConfigSchema = z.object({
   PORT: z.coerce.number().int().positive().default(4270),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -33,6 +39,7 @@ const ConfigSchema = z.object({
     .default('*'),
   REGISTRY_URL: z.string().url().default('http://localhost:4269'),
   REPOS_DIR: z.string().min(1).default(DEFAULT_REPOS_DIR),
+  LOGS_DIR: z.string().min(1).default(DEFAULT_LOGS_DIR),
 });
 
 const parseResult = ConfigSchema.safeParse(process.env);
@@ -65,4 +72,5 @@ export const config = {
   corsOrigins: validated.CORS_ORIGINS,
   registryUrl: validated.REGISTRY_URL,
   reposDir: validated.REPOS_DIR,
+  logsDir: validated.LOGS_DIR,
 };
