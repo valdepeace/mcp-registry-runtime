@@ -1,12 +1,22 @@
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { z } from 'zod';
 
 dotenv.config();
 
+// Same reasoning as apps/registry: default the DB next to the monorepo
+// clone (workspace root = repo root's parent) instead of the launching
+// process's cwd, so it's always in the same, discoverable place.
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = path.resolve(__dirname, '../../../..');
+const WORKSPACE_ROOT = path.dirname(REPO_ROOT);
+const DEFAULT_DB_PATH = path.join(WORKSPACE_ROOT, 'mcp-registry-runtime-data', 'runtime.db');
+
 const ConfigSchema = z.object({
   PORT: z.coerce.number().int().positive().default(3001),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  DB_PATH: z.string().min(1).default('./data/runtime.db'),
+  DB_PATH: z.string().min(1).default(DEFAULT_DB_PATH),
   JWT_SECRET: z.string().min(1).default('change-me-in-production'),
   CORS_ORIGINS: z
     .string()

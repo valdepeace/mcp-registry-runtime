@@ -113,10 +113,33 @@ npm run check      # Svelte type checking
 | `OFFICIAL_REGISTRY_URL` | https://registry.modelcontextprotocol.io | Official registry |
 | `SYNC_INTERVAL_MS` | 300000 | Sync interval (5 min) |
 | `SYNC_ON_STARTUP` | true | Sync when starting |
-| `DB_PATH` | ./data/registry.db | SQLite database path |
+| `DB_PATH` | `<workspace-root>/mcp-registry-runtime-data/registry.db` | SQLite database path |
 | `JWT_SECRET` | - | JWT signing secret |
 | `ADMIN_USERNAME` | admin | Initial admin user |
 | `ADMIN_PASSWORD` | admin | Initial admin password |
+
+`apps/runtime` has its own `DB_PATH`, defaulting to
+`<workspace-root>/mcp-registry-runtime-data/runtime.db`.
+
+### Where the database lives
+
+Both backends default `DB_PATH` to a fixed folder next to the repo clone
+itself, not to `process.cwd()` and not to an OS temp/app-data dir:
+
+```
+<workspace-root>/mcp-registry-runtime-data/
+├── registry.db   # apps/registry
+└── runtime.db    # apps/runtime
+```
+
+`<workspace-root>` is computed at startup as the parent folder of this
+repo — i.e. wherever you ran `git clone` — so every service and every
+teammate lands on the same DB location with zero configuration, regardless
+of whether you launch via `nx`, `pm2`, or a plain `node dist/index.js` from
+a different `cwd`. Set `DB_PATH` in `.env` to override it (see
+`apps/registry/.env.example` / `apps/runtime/.env.example`). Docker images
+are unaffected — they always use the absolute `/app/data/*.db` path set in
+`docker-compose.yml`.
 
 ## License
 
