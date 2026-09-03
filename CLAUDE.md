@@ -16,8 +16,8 @@ npm install
 npm run dev
 
 # Individual apps
-npm run dev:registry         # Registry on :3000 (tsx watch)
-npm run dev:runtime          # Runtime on :3001 (tsx watch)
+npm run dev:registry         # Registry on :4269 (tsx watch)
+npm run dev:runtime          # Runtime on :4270 (tsx watch)
 npm run dev:frontend         # Frontend on :5173 (Vite HMR, proxies to both backends)
 
 # Build
@@ -42,13 +42,13 @@ No test framework is configured yet.
 
 **Monorepo** using npm workspaces + nx (`apps/registry`, `apps/runtime`, `apps/frontend`, `packages/types`).
 
-### Registry (`apps/registry`, :3000) - Express.js + TypeScript (ESM)
+### Registry (`apps/registry`, :4269) - Express.js + TypeScript (ESM)
 
 - **Entry**: `src/index.ts` - Express app bootstrap, graceful shutdown
 - **Routes**: `src/routes/` - public (`/v0.1/*`), admin (`/admin/*`)
 - **Services**: `src/services/` - database (SQLite via better-sqlite3), sync, official-registry, skills-registry, `providers/` (skills.sh, Smithery, Vercel Labs), sync-event-bus (SSE)
 
-### Runtime (`apps/runtime`, :3001) - Express.js + TypeScript (ESM)
+### Runtime (`apps/runtime`, :4270) - Express.js + TypeScript (ESM)
 
 - **Routes**: `src/routes/runtime.routes.ts` mounted at `/admin/runtime`
 - **Services**: PM2 (via CLI), runtime, mcp-inspector, git (clone MCP server repos), event-bus (EventEmitter for SSE streaming)

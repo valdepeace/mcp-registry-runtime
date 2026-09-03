@@ -8,19 +8,19 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/v0.1': {
-        target: 'http://localhost:3003',
+        target: 'http://localhost:4269',
         changeOrigin: true
       },
       '/admin/runtime': {
-        target: 'http://localhost:3001',
+        target: 'http://localhost:4270',
         changeOrigin: true
       },
       '/admin': {
-        target: 'http://localhost:3003',
+        target: 'http://localhost:4269',
         changeOrigin: true
       },
       '/health': {
-        target: 'http://localhost:3003',
+        target: 'http://localhost:4269',
         changeOrigin: true
       }
     }

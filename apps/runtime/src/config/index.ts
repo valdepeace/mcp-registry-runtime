@@ -20,7 +20,7 @@ const DEFAULT_DB_PATH = path.join(WORKSPACE_ROOT, 'mcp-registry-runtime-data', '
 const DEFAULT_REPOS_DIR = path.join(os.homedir(), '.registry-mcp-runtime', 'repos');
 
 const ConfigSchema = z.object({
-  PORT: z.coerce.number().int().positive().default(3001),
+  PORT: z.coerce.number().int().positive().default(4270),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   DB_PATH: z.string().min(1).default(DEFAULT_DB_PATH),
   JWT_SECRET: z.string().min(1).default('change-me-in-production'),
@@ -31,7 +31,7 @@ const ConfigSchema = z.object({
       return origins.length > 0 ? origins : ['*'];
     })
     .default('*'),
-  REGISTRY_URL: z.string().url().default('http://localhost:3000'),
+  REGISTRY_URL: z.string().url().default('http://localhost:4269'),
   REPOS_DIR: z.string().min(1).default(DEFAULT_REPOS_DIR),
 });
 

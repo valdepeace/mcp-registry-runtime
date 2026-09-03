@@ -4,10 +4,10 @@ services:
       context: ./apps/registry
       dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "4269:4269"
     environment:
       - NODE_ENV=${NODE_ENV:-production}
-      - PORT=${PORT:-3000}
+      - PORT=${PORT:-4269}
       - OFFICIAL_REGISTRY_URL=${OFFICIAL_REGISTRY_URL:-https://registry.modelcontextprotocol.io}
       - SYNC_INTERVAL_MS=${SYNC_INTERVAL_MS:-300000}
       - DB_PATH=${DB_PATH:-/app/data/registry.db}
@@ -20,7 +20,7 @@ services:
       - registry-data:/app/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4269/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -38,20 +38,20 @@ services:
       context: ./apps/runtime
       dockerfile: Dockerfile
     ports:
-      - "3001:3001"
+      - "4270:4270"
     environment:
       - NODE_ENV=${NODE_ENV:-production}
-      - PORT=${RUNTIME_PORT:-3001}
+      - PORT=${RUNTIME_PORT:-4270}
       - DB_PATH=${RUNTIME_DB_PATH:-/app/data/runtime.db}
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
       - CORS_ORIGINS=${CORS_ORIGINS:-*}
-      - REGISTRY_URL=http://registry:3000
+      - REGISTRY_URL=http://registry:4269
       - REPOS_DIR=/app/data/repos
     volumes:
       - runtime-data:/app/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3001/health"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:4270/health"]
       interval: 30s
       timeout: 10s
       retries: 3

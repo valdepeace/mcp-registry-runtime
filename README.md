@@ -17,8 +17,8 @@ Private MCP (Model Context Protocol) server registry with official registry sync
 
 ```
 ├── apps/
-│   ├── registry/     # Express.js catalog API (:3000)
-│   ├── runtime/      # Express.js PM2 runtime API (:3001)
+│   ├── registry/     # Express.js catalog API (:4269)
+│   ├── runtime/      # Express.js PM2 runtime API (:4270)
 │   └── frontend/     # SvelteKit web UI (:5173)
 ├── packages/
 │   └── types/        # Shared Zod schemas and TypeScript types
@@ -39,8 +39,8 @@ npm install
 npm run dev
 
 # Or start individually
-npm run dev:registry   # Registry on http://localhost:3000
-npm run dev:runtime    # Runtime on http://localhost:3001
+npm run dev:registry   # Registry on http://localhost:4269
+npm run dev:runtime    # Runtime on http://localhost:4270
 npm run dev:frontend   # Frontend on http://localhost:5173
 ```
 
@@ -52,8 +52,8 @@ docker-compose up -d
 
 # Access:
 # - Frontend: http://localhost:5173
-# - Registry API: http://localhost:3000
-# - Runtime API: http://localhost:3001
+# - Registry API: http://localhost:4269
+# - Runtime API: http://localhost:4270
 ```
 
 ## Development
@@ -109,7 +109,7 @@ npm run check      # Svelte type checking
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `PORT` | 3000 | Server port |
+| `PORT` | 4269 | Server port |
 | `OFFICIAL_REGISTRY_URL` | https://registry.modelcontextprotocol.io | Official registry |
 | `SYNC_INTERVAL_MS` | 300000 | Sync interval (5 min) |
 | `SYNC_ON_STARTUP` | true | Sync when starting |

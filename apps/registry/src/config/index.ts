@@ -18,7 +18,7 @@ const WORKSPACE_ROOT = path.dirname(REPO_ROOT);
 const DEFAULT_DB_PATH = path.join(WORKSPACE_ROOT, 'mcp-registry-runtime-data', 'registry.db');
 
 const ConfigSchema = z.object({
-  PORT: z.coerce.number().int().positive().default(3000),
+  PORT: z.coerce.number().int().positive().default(4269),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
   OFFICIAL_REGISTRY_URL: z.string().url().default('https://registry.modelcontextprotocol.io'),
   OFFICIAL_SKILLS_REGISTRY_URL: z.string().url().optional(),
