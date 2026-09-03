@@ -66,6 +66,9 @@
             <a href="/admin/pm2" class="text-sm text-gray-600 hover:text-gray-900">
               PM2
             </a>
+            <a href="/admin/agents" class="text-sm text-gray-600 hover:text-gray-900">
+              Agents
+            </a>
             <button
               type="button"
               onclick={() => auth.logout()}

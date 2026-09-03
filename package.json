@@ -12,6 +12,7 @@
     "dev:registry": "nx run registry:dev",
     "dev:runtime": "nx run runtime:dev",
     "dev:frontend": "nx run frontend:dev",
+    "dev:a2a-gateway": "nx run a2a-gateway:dev",
     "debug": "nx run-many -t debug -p registry,runtime --parallel=2",
     "debug:registry": "nx run registry:debug",
     "debug:runtime": "nx run runtime:debug",
@@ -19,6 +20,7 @@
     "build:registry": "nx run registry:build",
     "build:runtime": "nx run runtime:build",
     "build:frontend": "nx run frontend:build",
+    "build:a2a-gateway": "nx run a2a-gateway:build",
     "start": "nx run registry:start",
     "typecheck": "nx run-many -t typecheck --parallel=4"
   },

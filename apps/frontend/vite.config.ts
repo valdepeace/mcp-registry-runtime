@@ -15,6 +15,10 @@ export default defineConfig({
         target: 'http://localhost:4270',
         changeOrigin: true
       },
+      '/admin/a2a': {
+        target: 'http://localhost:4271',
+        changeOrigin: true
+      },
       '/admin': {
         target: 'http://localhost:4269',
         changeOrigin: true

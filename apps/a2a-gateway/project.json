@@ -1,0 +1,27 @@
+{
+  "name": "a2a-gateway",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "root": "apps/a2a-gateway",
+  "sourceRoot": "apps/a2a-gateway/src",
+  "targets": {
+    "dev": {
+      "continuous": true,
+      "command": "tsx watch src/index.ts",
+      "options": { "cwd": "{projectRoot}" }
+    },
+    "build": {
+      "command": "tsc",
+      "options": { "cwd": "{projectRoot}" }
+    },
+    "typecheck": {
+      "command": "tsc --noEmit",
+      "options": { "cwd": "{projectRoot}" }
+    },
+    "start": {
+      "command": "node dist/index.js",
+      "options": { "cwd": "{projectRoot}" },
+      "dependsOn": ["build"]
+    }
+  }
+}

@@ -22,6 +22,8 @@ import type {
   SkillResponse,
   SkillListParams,
   SkillDetail,
+  A2AApiKey,
+  A2ARequestLog,
 } from '$lib/types';
 
 const API_BASE = '';
@@ -480,7 +482,26 @@ class ApiClient {
     });
   }
 
+  // A2A gateway — external-agent keys and their request log
 
+  async listA2AKeys(): Promise<{ keys: A2AApiKey[] }> {
+    return this.request('/admin/a2a/keys');
+  }
+
+  async issueA2AKey(label: string, requestsPerMin?: number): Promise<{ key: A2AApiKey; plaintext: string }> {
+    return this.request('/admin/a2a/keys', {
+      method: 'POST',
+      body: JSON.stringify({ label, requests_per_min: requestsPerMin }),
+    });
+  }
+
+  async revokeA2AKey(id: string): Promise<{ message: string }> {
+    return this.request(`/admin/a2a/keys/${id}`, { method: 'DELETE' });
+  }
+
+  async listA2ARequests(limit = 100): Promise<{ requests: A2ARequestLog[] }> {
+    return this.request(`/admin/a2a/requests?limit=${limit}`);
+  }
 }
 
 export const api = new ApiClient();

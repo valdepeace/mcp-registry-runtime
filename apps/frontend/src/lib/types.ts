@@ -318,6 +318,31 @@ export interface SkillListParams {
 }
 
 
+// A2A gateway
+
+export interface A2AApiKey {
+  id: string;
+  label: string;
+  key_prefix: string;
+  requests_per_min: number;
+  created_at: string;
+  revoked_at: string | null;
+}
+
+export interface A2ARequestLog {
+  id: string;
+  key_id: string;
+  key_label: string;
+  skill: string;
+  status: 'completed' | 'failed' | 'input-required' | 'working';
+  input_json: string | null;
+  result_json: string | null;
+  error: string | null;
+  instance_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** One column of a DataTable. `value` feeds both the cell text and the sorting. */
 export interface TableColumn<Row> {
   key: string;
