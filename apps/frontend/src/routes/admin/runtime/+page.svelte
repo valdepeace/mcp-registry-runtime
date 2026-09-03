@@ -153,6 +153,14 @@
     }
   }
 
+  async function handleOpenFolder(id: string) {
+    try {
+      await api.openRuntimeInstanceFolder(id);
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'Failed to open folder';
+    }
+  }
+
   async function handleShowLogs(instance: RuntimeInstance) {
     logsInstance = instance;
     logsContent = '';
@@ -487,6 +495,7 @@
               onEdit={() => handleOpenEdit(instance)}
               onInspect={() => inspectInstance = instance}
               onDelete={() => handleDelete(instance.id)}
+              onOpenFolder={() => handleOpenFolder(instance.id)}
             />
           </div>
         </div>

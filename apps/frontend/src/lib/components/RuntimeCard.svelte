@@ -11,10 +11,11 @@
     onEdit: () => void;
     onInspect: () => void;
     onDelete: () => void;
+    onOpenFolder: () => void;
     loading?: boolean;
   }
 
-  let { instance, onStart, onStop, onRestart, onLogs, onEdit, onInspect, onDelete, loading = false }: Props = $props();
+  let { instance, onStart, onStop, onRestart, onLogs, onEdit, onInspect, onDelete, onOpenFolder, loading = false }: Props = $props();
 
   // HTTP mode: needs endpoint_url + running. Stdio mode: no endpoint_url → always inspectable.
   const canInspect = $derived(
@@ -118,8 +119,18 @@
 
   <!-- Cloned repo path on this machine -->
   {#if instance.cwd}
-    <div class="text-xs text-gray-400 mb-3 font-mono truncate" title={instance.cwd}>
-      Path: {instance.cwd}
+    <div class="flex items-center gap-1 mb-3 min-w-0">
+      <div class="text-xs text-gray-400 font-mono truncate flex-1" title={instance.cwd}>
+        Path: {instance.cwd}
+      </div>
+      <button
+        type="button"
+        onclick={onOpenFolder}
+        title="Open in file explorer"
+        class="text-xs text-gray-400 hover:text-gray-700 px-1 shrink-0"
+      >
+        📁
+      </button>
     </div>
   {/if}
 

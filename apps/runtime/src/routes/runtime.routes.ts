@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { spawn } from 'child_process';
 import { runtimeService, databaseService, runtimeEventBus, mcpInspectorService, pm2Service, provisionService, PENDING_PROVISION } from '../services/index.js';
 import type { RuntimeEventName } from '../services/index.js';
 import { validateBody, validateQuery } from '../middleware/index.js';
@@ -12,6 +13,27 @@ import { buildArgs, resolveLocalPort, type ArgSpec } from '../services/catalog-a
 import { config } from '../config/index.js';
 
 const router = Router();
+
+// Opens the OS file manager on the cloned repo's folder, for the "where is
+// this code on my machine" ask. Only ever called with a path already stored
+// in runtime_instances.cwd (set by git.service on clone), never raw user
+// input — args array (not shell string) so nothing to inject either way.
+// No-op with an error in headless environments (e.g. Docker) with no desktop.
+function openInFileExplorer(targetPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const platform = process.platform;
+    const [cmd, args] =
+      platform === 'win32' ? ['explorer', [targetPath]] :
+      platform === 'darwin' ? ['open', [targetPath]] :
+      ['xdg-open', [targetPath]];
+
+    const child = spawn(cmd, args, { stdio: 'ignore' });
+    child.on('error', reject);
+    // explorer.exe often exits 1 even on success — resolve regardless of code,
+    // only a spawn-level error (binary missing, no desktop) is a real failure.
+    child.on('exit', () => resolve());
+  });
+}
 
 router.get('/events', (req: Request, res: Response) => {
   res.writeHead(200, {
@@ -366,6 +388,38 @@ router.delete('/instances/:id', async (req: Request, res: Response) => {
   } catch (err) {
     console.error('[Runtime] Error deleting instance:', err);
     res.status(500).json({ error: 'Failed to delete instance' });
+    return;
+  }
+});
+
+router.post('/instances/:id/open-folder', async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const instance = runtimeService.getInstance(id);
+
+    if (!instance) {
+      res.status(404).json({ error: 'Instance not found' });
+      return;
+    }
+    if (!instance.cwd) {
+      res.status(400).json({ error: 'This instance has no cloned code on disk (npx-based server)' });
+      return;
+    }
+
+    try {
+      await openInFileExplorer(instance.cwd);
+    } catch (err) {
+      // Most likely: running headless (e.g. in Docker) with no desktop to open a
+      // window on. Not fatal — the path is still shown in the UI to copy by hand.
+      res.status(422).json({ error: `Could not open a file explorer window: ${(err as Error).message}` });
+      return;
+    }
+
+    res.json({ message: 'Opened', path: instance.cwd });
+    return;
+  } catch (err) {
+    console.error('[Runtime] Error opening instance folder:', err);
+    res.status(500).json({ error: 'Failed to open folder' });
     return;
   }
 });

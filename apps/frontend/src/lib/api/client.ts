@@ -287,6 +287,12 @@ class ApiClient {
     });
   }
 
+  async openRuntimeInstanceFolder(id: string): Promise<{ message: string; path: string }> {
+    return this.request(`/admin/runtime/instances/${id}/open-folder`, {
+      method: 'POST'
+    });
+  }
+
   async getRuntimeInstanceLogs(id: string, tail: number = 200): Promise<RuntimeLogsResponse> {
     return this.request<RuntimeLogsResponse>(`/admin/runtime/instances/${id}/logs?tail=${tail}`);
   }
