@@ -116,6 +116,13 @@
     {instance.exec_cmd} {instance.exec_args?.join(' ') || ''}
   </div>
 
+  <!-- Cloned repo path on this machine -->
+  {#if instance.cwd}
+    <div class="text-xs text-gray-400 mb-3 font-mono truncate" title={instance.cwd}>
+      Path: {instance.cwd}
+    </div>
+  {/if}
+
   <!-- Error message -->
   {#if instance.last_error}
     <div class="text-xs text-red-600 bg-red-50 p-2 rounded mb-3 max-h-20 overflow-auto">
