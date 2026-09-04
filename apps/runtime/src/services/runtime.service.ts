@@ -154,7 +154,8 @@ export class RuntimeService {
         instance.exec_cmd,
         instance.exec_args ?? [],
         instance.cwd,
-        instance.env_json
+        instance.env_json,
+        !instance.endpoint_url && !instance.port
       );
 
       await this.sleep(1500);

@@ -62,7 +62,8 @@ export class PM2Service {
     cmd: string,
     args: string[] = [],
     cwd?: string,
-    env?: Record<string, string>
+    env?: Record<string, string>,
+    isStdio = false
   ): Promise<void> {
     mkdirSync(config.logsDir, { recursive: true });
     const { command: script, args: scriptArgs } = launchable(cmd, args, process.platform, ownLogPaths(pm2Name));
@@ -80,7 +81,25 @@ export class PM2Service {
       args: scriptArgs.length > 0 ? scriptArgs : undefined,
       cwd,
       env: env ? ({ ...process.env, ...env } as Record<string, string>) : undefined,
+      // A stdio MCP is a command that sends/receives on stdin/stdout and
+      // exits — not a long-running service. Exiting is its normal life
+      // cycle, not a crash, so PM2 must never relaunch it on its own; only an
+      // explicit Start/Restart from the dashboard should. HTTP-transport
+      // instances (endpoint_url/port set) are real always-on servers, so they
+      // keep the crash-loop circuit breaker below.
+      autorestart: !isStdio,
+      // Circuit breaker for crash loops (HTTP instances only): PM2 only
+      // counts a restart as "unstable" if the process dies within min_uptime
+      // of starting, and once unstable_restarts hits max_restarts within that
+      // window it stops touching the process for good — no infinite retry,
+      // ever (verified in pm2's own God.js). Explicit here instead of relying
+      // on PM2's default.
+      min_uptime: 3000,
       max_restarts: 5,
+      // Without a delay, a server that crashes on startup burns through all 5
+      // restarts almost instantly — a rapid start/stop churn that shows up as
+      // flapping status in the dashboard. Back off exponentially instead.
+      exp_backoff_restart_delay: 100,
       // Only the untouched direct-launch case (script === cmd) can still be a
       // bare .js file PM2 should auto-interpret with node; every wrapped case
       // (cmd.exe, or our own launch-and-log.mjs via process.execPath) is

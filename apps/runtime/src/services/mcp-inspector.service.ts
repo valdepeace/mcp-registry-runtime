@@ -232,6 +232,10 @@ class McpInspectorService {
       cwd: instance.cwd ?? undefined,
       env,
       stdio: ['pipe', 'pipe', 'pipe'],
+      // Windows wraps stdio launches in `cmd /c` (see spawn-compat.ts) —
+      // without this, every inspect spawns a visible console window that
+      // flashes open/closed. windowsHide keeps it off-screen; no-op elsewhere.
+      windowsHide: true,
     });
 
     let idCounter = 1;
@@ -298,7 +302,19 @@ class McpInspectorService {
     const cleanup = () => {
       rl.close();
       try { child.stdin!.end(); } catch { /* ignore */ }
-      setTimeout(() => { if (!child.killed) child.kill(); }, 500);
+      setTimeout(() => {
+        if (child.killed || child.exitCode !== null) return;
+        if (process.platform === 'win32') {
+          // Windows wraps stdio launches in `cmd /c` (spawn-compat.ts) — the
+          // pid we hold is that cmd.exe wrapper, not the npx/node process it
+          // spawned underneath. child.kill() only kills the wrapper, leaving
+          // the real MCP process orphaned on every inspect call. taskkill /t
+          // kills the whole tree instead.
+          spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], { stdio: 'ignore', windowsHide: true });
+        } else {
+          child.kill();
+        }
+      }, 500);
     };
 
     await rpc('initialize', {
