@@ -30,6 +30,37 @@
   let localPreview = $state<{ exec_cmd: string; exec_args: string[] } | null>(null);
   let localError = $state<string | null>(null);
 
+  // Folder picker modal — the browser can't return an absolute OS path on its
+  // own (see the "para el create runtime instance" thread), so this walks the
+  // runtime's own filesystem via /admin/runtime/browse-dir instead.
+  let browsing = $state(false);
+  let browsePath = $state('');
+  let browseParent = $state<string | null>(null);
+  let browseEntries = $state<string[]>([]);
+  let browseError = $state<string | null>(null);
+
+  async function loadBrowseDir(dir?: string) {
+    browseError = null;
+    try {
+      const res = await api.browseDir(dir);
+      browsePath = res.path;
+      browseParent = res.parent;
+      browseEntries = res.entries;
+    } catch (e) {
+      browseError = e instanceof Error ? e.message : 'Could not read that folder';
+    }
+  }
+
+  function openBrowser() {
+    browsing = true;
+    loadBrowseDir(localPath.trim() || undefined);
+  }
+
+  function useBrowsedFolder() {
+    localPath = browsePath;
+    browsing = false;
+  }
+
   async function detectLocal() {
     if (!localPath.trim()) return;
     localDetecting = true;
@@ -207,6 +238,14 @@
           disabled={loading}
           class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
+        <button
+          type="button"
+          onclick={openBrowser}
+          disabled={loading}
+          class="px-3 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200 disabled:opacity-50"
+        >
+          Browse…
+        </button>
         <button
           type="button"
           onclick={detectLocal}
@@ -422,4 +461,61 @@
     </button>
   </div>
 </form>
+{/if}
+
+{#if browsing}
+  <div class="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onclick={() => browsing = false}>
+    <div class="bg-white rounded-lg shadow-xl w-full max-w-lg max-h-[70vh] flex flex-col" onclick={(e) => e.stopPropagation()}>
+      <div class="px-4 py-3 border-b">
+        <div class="text-sm font-medium text-gray-800">Pick a folder</div>
+        <div class="text-xs text-gray-500 font-mono break-all mt-1">{browsePath}</div>
+      </div>
+
+      {#if browseError}
+        <div class="mx-4 mt-3 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded text-xs">
+          {browseError}
+        </div>
+      {/if}
+
+      <div class="flex-1 overflow-y-auto px-2 py-2">
+        {#if browseParent}
+          <button
+            type="button"
+            onclick={() => loadBrowseDir(browseParent ?? undefined)}
+            class="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-gray-100 text-gray-600"
+          >
+            .. (up)
+          </button>
+        {/if}
+        {#each browseEntries as name (name)}
+          <button
+            type="button"
+            onclick={() => loadBrowseDir(`${browsePath}${browsePath.endsWith('\\') || browsePath.endsWith('/') ? '' : '/'}${name}`)}
+            class="w-full text-left px-3 py-1.5 text-sm rounded hover:bg-gray-100 text-gray-800"
+          >
+            📁 {name}
+          </button>
+        {:else}
+          <div class="px-3 py-2 text-xs text-gray-400">No subfolders here</div>
+        {/each}
+      </div>
+
+      <div class="flex justify-end gap-3 px-4 py-3 border-t">
+        <button
+          type="button"
+          onclick={() => browsing = false}
+          class="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded hover:bg-gray-200"
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          onclick={useBrowsedFolder}
+          class="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded hover:bg-blue-700"
+        >
+          Use this folder
+        </button>
+      </div>
+    </div>
+  </div>
 {/if}

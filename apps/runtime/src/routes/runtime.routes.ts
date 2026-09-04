@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { spawn } from 'child_process';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { runtimeService, databaseService, runtimeEventBus, mcpInspectorService, pm2Service, provisionService, detectProject, PENDING_PROVISION } from '../services/index.js';
 import type { RuntimeEventName } from '../services/index.js';
@@ -36,6 +37,38 @@ function openInFileExplorer(targetPath: string): Promise<void> {
     child.on('exit', () => resolve());
   });
 }
+
+// Lets the "from local folder" picker walk this machine's filesystem, since a
+// browser can never hand back an absolute OS path on its own (see the folder
+// input in CreateRuntimeForm). Directories only — this is for picking a cwd,
+// not a file explorer.
+router.get('/browse-dir', (req: Request, res: Response) => {
+  const requested = (req.query.path as string | undefined) || os.homedir();
+
+  if (!path.isAbsolute(requested)) {
+    res.status(400).json({ error: 'path must be absolute' });
+    return;
+  }
+  if (!fs.existsSync(requested) || !fs.statSync(requested).isDirectory()) {
+    res.status(400).json({ error: `Not a directory: ${requested}` });
+    return;
+  }
+
+  let entries: string[];
+  try {
+    entries = fs.readdirSync(requested, { withFileTypes: true })
+      .filter(e => e.isDirectory() && !e.name.startsWith('.'))
+      .map(e => e.name)
+      .sort((a, b) => a.localeCompare(b));
+  } catch {
+    res.status(403).json({ error: 'Cannot read that folder' });
+    return;
+  }
+
+  const parent = path.dirname(requested);
+  res.json({ path: requested, parent: parent === requested ? null : parent, entries });
+  return;
+});
 
 router.get('/events', (req: Request, res: Response) => {
   res.writeHead(200, {

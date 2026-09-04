@@ -354,6 +354,12 @@ class ApiClient {
     });
   }
 
+  /** Lists subfolders of `path` on the runtime's machine (defaults to its home dir) — backs the folder picker, since a browser can't hand back an absolute OS path. */
+  async browseDir(path?: string): Promise<{ path: string; parent: string | null; entries: string[] }> {
+    const query = path ? `?path=${encodeURIComponent(path)}` : '';
+    return this.request(`/admin/runtime/browse-dir${query}`);
+  }
+
   // MCP Inspector API
 
   async getInspectCapabilities(id: string): Promise<McpCapabilities> {
